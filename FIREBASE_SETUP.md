@@ -54,7 +54,7 @@ Use a dedicated Google Cloud service account with **Cloud Datastore User** (`rol
 
 The private JSON belongs only in the server environment. **Do not paste it into chat, the admin editor, GitHub, or frontend code.** A service-account key bypasses Firestore rules, so treat it like a password. Rotate/delete a leaked key immediately.
 
-For `npm run dev` (Next.js), copy `.env.example` to `.env.local`. For local Workers development, copy `.dev.vars.example` to `.dev.vars`. The public web configuration for `anbu-portfolio-b91f6` is already filled in these example files. Put your private server JSON key on one line in the ignored local environment file. `FIREBASE_SERVICE_ACCOUNT_JSON='{"type":...}'` must preserve the JSON's `\n` escapes in `private_key`. The entire file is Git-ignored. An alternative is to store the JSON in an ignored local file and use your host's secret UI to set the server variable.
+For `npm run dev` (Next.js), copy `.env.example` to `.env.local`. For local Workers development, copy `.dev.vars.example` to `.dev.vars`. The public project identifiers for `anbu-portfolio-b91f6` are filled in the example files; fill the blank `FIREBASE_API_KEY` from Firebase Project settings in your ignored local file and production host settings. Put your private server JSON key on one line in the ignored local environment file. `FIREBASE_SERVICE_ACCOUNT_JSON='{"type":...}'` must preserve the JSON's `\n` escapes in `private_key`. The entire file is Git-ignored. An alternative is to store the JSON in an ignored local file and use your host's secret UI to set the server variable.
 
 ## 5. Start and verify
 

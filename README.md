@@ -33,11 +33,11 @@ node scripts/check-firebase.mjs
 node scripts/check-firestore.mjs
 ```
 
-The portfolio and Resume Studio are publicly accessible without login. Only portfolio administration requires verified owner authentication. The active Firebase project is `anbu-portfolio-b91f6`; its public web configuration is provided in the example environment files. The private server credential and owner UID still need to be configured.
+The portfolio and Resume Studio are publicly accessible without login. Only portfolio administration requires verified owner authentication. The active Firebase project is `anbu-portfolio-b91f6`; its public project identifiers are provided in the example environment files. Fill `FIREBASE_API_KEY` from Firebase Project settings in your ignored local environment file and host environment settings. The private server credential and owner UID still need to be configured.
 
 ## Deploy to Vercel
 
-Import this GitHub repository as a Next.js project. Use the repository root and `npm run build`; leave the output directory at its default. In project environment settings, add `FIREBASE_API_KEY`, `FIREBASE_AUTH_DOMAIN`, `FIREBASE_PROJECT_ID`, and `FIREBASE_APP_ID` using `.env.example`. Add the private `FIREBASE_SERVICE_ACCOUNT_JSON` directly in Vercel as a sensitive server variable. After the first authorized Google login, set `FIREBASE_OWNER_UID` and redeploy.
+Import this GitHub repository as a Next.js project. Use the repository root and `npm run build`; leave the output directory at its default. In project environment settings, add `FIREBASE_API_KEY`, `FIREBASE_AUTH_DOMAIN`, `FIREBASE_PROJECT_ID`, and `FIREBASE_APP_ID` using `.env.example` and your Firebase web app configuration. The API key placeholder is intentionally blank. Add the private `FIREBASE_SERVICE_ACCOUNT_JSON` directly in Vercel as a sensitive server variable. After the first authorized Google login, set `FIREBASE_OWNER_UID` and redeploy.
 
 Enable Google sign-in and create the default Firestore database in the Firebase console. Publish the rules in `firebase/firestore.rules`, apply the index exemptions in `firebase/firestore.indexes.json`, and add your exact deployed hostname to Firebase Authentication's authorized domains. See `FIREBASE_SETUP.md` for details.
 

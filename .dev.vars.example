@@ -3,8 +3,9 @@
 GEMINI_API_KEY=
 GEMINI_MODEL=gemini-3.5-flash-lite
 
-# Firebase Spark: public web configuration (identifiers, not private server credentials)
-FIREBASE_API_KEY=AIzaSyAgzftVksQKTXsF-tHYnKZWqpPqqCpM4Ms
+# Firebase Spark: public web configuration
+# Fill the API key in your ignored local environment file and host settings.
+FIREBASE_API_KEY=
 FIREBASE_AUTH_DOMAIN=anbu-portfolio-b91f6.firebaseapp.com
 FIREBASE_PROJECT_ID=anbu-portfolio-b91f6
 FIREBASE_APP_ID=1:460578562320:web:64ea1db31645934d3d4595

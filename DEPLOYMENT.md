@@ -6,7 +6,7 @@ The app is configured in code for Firebase Spark Authentication and Firestore, i
 
 The Sites deployment is active and public at https://anbu-selvan-portfolio.polite-hero-4309.chatgpt.site. Portfolio visitors and Resume Studio users do not need to log in. Admin routes and data APIs require verified owner authentication. The existing Site project identifier remains in `.openai/hosting.json`. Vercel deployment is supported by `vercel.json` and the Next.js build.
 
-Firebase public web configuration for `anbu-portfolio-b91f6` is present in the example environment files and configured on the existing Sites deployment. A server-only service-account secret and owner UID have not yet been provided. Until then the public page shows the bundled content kit; admin access, contact delivery, and persistent cloud mutations are unavailable. No development account or trusted browser header can bypass the new Firebase admin verification.
+Firebase public project identifiers for `anbu-portfolio-b91f6` are present in the example environment files; the API key is configured only in ignored local files and host environment settings and configured on the existing Sites deployment. A server-only service-account secret and owner UID have not yet been provided. Until then the public page shows the bundled content kit; admin access, contact delivery, and persistent cloud mutations are unavailable. No development account or trusted browser header can bypass the new Firebase admin verification.
 
 ## Run locally
 
