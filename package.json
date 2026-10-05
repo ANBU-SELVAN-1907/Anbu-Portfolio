@@ -16,6 +16,7 @@
     "format": "prettier --write app components lib hooks db",
     "check:resume": "node scripts/check-resume.mjs",
     "check:auth": "node scripts/check-firebase.mjs",
+    "check:public-content": "node scripts/check-public-content.mjs",
     "check:storage": "node scripts/check-firestore.mjs"
   },
   "dependencies": {

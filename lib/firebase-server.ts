@@ -25,7 +25,38 @@ export async function snapshot() {
       };
 }
 export async function published() {
-  return (await snapshot()).published;
+  if (!firebaseReady()) return newEditorialContent();
+  try {
+    const row = await store.get("content", "main");
+    return row
+      ? normalizeContent(JSON.parse(String(row.published)) as Content)
+      : newEditorialContent();
+  } catch (error) {
+    // Never print raw credential/JSON errors or fall back to a private draft.
+    const reason = publicContentFailure(error);
+    console.error(
+      "Public Firebase content unavailable; using bundled portfolio.",
+      {
+        reason,
+      },
+    );
+    return newEditorialContent();
+  }
+}
+function publicContentFailure(error: unknown): string {
+  if (error instanceof SyntaxError) return "invalid_json";
+  if (!(error instanceof Error)) return "content_read_failed";
+  if (error.message === "Firebase configuration mismatch.")
+    return "firebase_project_mismatch";
+  if (error.message === "Firebase server authorization failed.")
+    return "service_account_authorization_failed";
+  const status = /^Firebase request failed \(([1-5]\d{2})\)\.$/.exec(
+    error.message,
+  );
+  if (status) return `firestore_http_${status[1]}`;
+  if (error.name === "AbortError" || error.name === "TimeoutError")
+    return "firebase_timeout";
+  return "content_read_failed";
 }
 export async function ensureContent() {
   const s = JSON.stringify(newEditorialContent());

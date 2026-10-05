@@ -50,6 +50,8 @@ The backend uses fixed `portfolio_*` collections. Firestore's automatic single-f
 
 ## 4. Server credential — keep it private
 
+The service-account JSON's `project_id` must match `FIREBASE_PROJECT_ID` exactly. For this installation both must be `anbu-portfolio-b91f6`. A key from a separate project named `anbu-portfolio` cannot be used with this configuration. Put only a valid, unexposed credential from the correct project in your hosting environment.
+
 Use a dedicated Google Cloud service account with **Cloud Datastore User** (`roles/datastore.user`) on this project. It needs Firestore data access, not Owner/Editor or Storage permissions. Generate its JSON key from Google Cloud IAM → Service accounts → that account → Keys. Creating/changing this credential must be done by you in your account.
 
 The private JSON belongs only in the server environment. **Do not paste it into chat, the admin editor, GitHub, or frontend code.** A service-account key bypasses Firestore rules, so treat it like a password. Rotate/delete a leaked key immediately.

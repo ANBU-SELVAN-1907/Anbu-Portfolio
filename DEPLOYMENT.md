@@ -22,6 +22,8 @@ Open `http://localhost:5173/`, `/admin`, and `/resume-builder`. The builder work
 
 ## Production
 
+Public pages read only published content. If Firebase configuration, authorization, database access, or published JSON fails, the portfolio and Resume Studio use the bundled public content. Server logs contain a safe reason code such as `firebase_project_mismatch` or `firestore_http_403`; raw credentials and malformed JSON are never logged. Admin draft reads and writes remain strict, so an outage cannot silently replace stored edits with bundled defaults.
+
 For Sites, use the existing source/version/deployment workflow. For Vercel, import this repository using Next.js, build with `npm run build`, and configure the server environment variables from `.env.example` through Vercel project settings before redeploying. The app's React server runtime remains a Worker; Firebase is the external backend. Set `FIREBASE_*` variables as host environment variables/secrets. `FIREBASE_SERVICE_ACCOUNT_JSON` is private and must never appear in Git, client bundles, or the admin editor. Public Firebase configuration may be exposed by `/api/auth/config`.
 
 Standalone deployment can use Cloudflare Workers Free with a free `workers.dev` subdomain because owner auth is now independently verified through Firebase. Firebase Hosting's static free tier does not run this dynamic server. Do not select Firebase App Hosting/Functions or enable billing when strict zero-cost operation is required. The starter's Cloudflare database ID is a placeholder, not a production resource. Legacy D1/R2 source schemas and local data are retained for migration. Their hosting bindings are now disabled; runtime storage uses Firestore.
