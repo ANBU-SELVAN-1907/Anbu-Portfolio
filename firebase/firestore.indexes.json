@@ -1,0 +1,9 @@
+{
+  "indexes": [],
+  "fieldOverrides": [
+    {"collectionGroup":"portfolio_content","fieldPath":"draft","indexes":[]},
+    {"collectionGroup":"portfolio_content","fieldPath":"published","indexes":[]},
+    {"collectionGroup":"portfolio_history","fieldPath":"payload","indexes":[]},
+    {"collectionGroup":"portfolio_files","fieldPath":"body","indexes":[]}
+  ]
+}

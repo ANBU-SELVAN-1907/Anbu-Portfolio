@@ -1,0 +1,9 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // The web app never accesses Firestore directly. All access goes through
+    // server endpoints that verify Firebase owner identity and publication.
+    // Server IAM credentials bypass these rules; keep that key server-only.
+    match /{document=**} { allow read, write: if false; }
+  }
+}
