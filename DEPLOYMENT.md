@@ -5,7 +5,7 @@
 - Source: [ANBU-SELVAN-1907/Anbu-Portfolio](https://github.com/ANBU-SELVAN-1907/Anbu-Portfolio)
 - Hosting: Vercel **Hobby**, native Next.js 16 + React 19
 - Backend: Firebase **Spark**, email-link/Google sign-in + Firestore
-- Files: private Firestore uploads up to **512 KiB**, larger static assets in `public/`
+- Files: private Firestore uploads up to **4 MiB**, larger static assets in `public/`
 - Optional AI: Google AI Studio free-tier key, server-only
 
 No paid upgrade, Cloud Storage, Supabase, Firebase Functions/App Hosting, Vercel Blob or paid domain is required. Vercel Hobby is for personal, non-commercial use, with quotas; it is not an unlimited free enterprise service. [Plan terms and limits](https://vercel.com/docs/plans/hobby)

@@ -3,12 +3,7 @@ import Image from "next/image";
 import { useState } from "react";
 import { Award, ArrowUpRight, ImageIcon } from "lucide-react";
 import type { Entry } from "@/lib/content";
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  DialogDescription,
-} from "./ui/dialog";
+import EvidenceViewer from "./evidence-viewer";
 export default function AchievementGallery({ entries }: { entries: Entry[] }) {
   const [filter, setFilter] = useState("All"),
     [limit, setLimit] = useState(9),
@@ -93,39 +88,7 @@ export default function AchievementGallery({ entries }: { entries: Entry[] }) {
           Show more achievements ({items.length - limit})
         </button>
       )}
-      <Dialog
-        open={!!selected}
-        onOpenChange={(v) => {
-          if (!v) setSelected(null);
-        }}
-      >
-        <DialogContent className="folio-dialog gallery-dialog">
-          <DialogTitle>{selected?.title}</DialogTitle>
-          <DialogDescription>
-            {selected?.subtitle} · {selected?.period}
-          </DialogDescription>
-          {selected?.image && (
-            <Image
-              unoptimized
-              src={selected.image}
-              alt={selected.title}
-              width={1000}
-              height={750}
-            />
-          )}
-          <p>{selected?.description}</p>
-          {selected?.link && (
-            <a
-              className="button"
-              href={selected.link}
-              target="_blank"
-              rel="noreferrer"
-            >
-              View source <ArrowUpRight size={16} />
-            </a>
-          )}
-        </DialogContent>
-      </Dialog>
+      <EvidenceViewer entry={selected} onClose={() => setSelected(null)} />
     </>
   );
 }

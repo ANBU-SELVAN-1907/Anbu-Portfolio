@@ -39,7 +39,7 @@ npm run check:imports
 
 Deploy the repository to Vercel Hobby using the Next.js preset. Firebase and Gemini configuration must be supplied privately through local/server environment files, never committed or pasted into chat.
 
-The admin includes a dedicated **Resume download** tab: upload a PDF, save the draft, then publish. Visitors receive that exact PDF from **Get my resume**. Maximum free-plan upload: 512 KiB.
+The admin includes a dedicated **Resume download** tab: upload a PDF, save the draft, then publish. Visitors receive that exact PDF from **Get my resume**. Maximum free-plan upload: 4 MiB.
 
 The studio supports 30-step undo/redo, tab-local draft recovery, searchable and collapsible entries, duplication, ordering, visibility controls, and JSON backups. Publishing and restoring use revision checks to protect concurrent edits.
 

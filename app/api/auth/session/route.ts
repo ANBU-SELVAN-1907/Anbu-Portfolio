@@ -6,7 +6,7 @@ import {
   jsonBody,
   limited,
 } from "@/lib/server";
-import { firebaseReady } from "@/lib/firebase";
+import { firebaseReady, firebaseSetupMessage } from "@/lib/firebase";
 export async function POST(r: Request) {
   if (!sameOrigin(r))
     return response({ error: "Use the sign-in page on this website." }, 403);
@@ -39,8 +39,12 @@ export async function POST(r: Request) {
     const failure = requestFailure(e);
     if (failure) return failure;
     return response(
-      { error: "Sign-in could not be verified. Please retry." },
-      401,
+      {
+        error:
+          firebaseSetupMessage(e) ||
+          "The sign-in token expired or could not be verified. Request a fresh link or sign in with Google again.",
+      },
+      firebaseSetupMessage(e) ? 503 : 401,
     );
   }
 }

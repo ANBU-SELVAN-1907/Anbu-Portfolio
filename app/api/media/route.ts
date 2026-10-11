@@ -8,24 +8,31 @@ import {
   snapshot,
   boundedBytes,
 } from "@/lib/server";
+import { MAX_MEDIA_BYTES } from "@/lib/media";
 export async function POST(r: Request) {
   try {
     if (!sameOrigin(r) || !(await admin()))
       return response({ error: "Admin authorization required." }, 403);
-    if (Number(r.headers.get("content-length")) > 600_000)
-      return response({ error: "Maximum upload size is 512 KB." }, 413);
+    if (Number(r.headers.get("content-length")) > MAX_MEDIA_BYTES + 65536)
+      return response({ error: "Maximum upload size is 4 MiB." }, 413);
     if (!r.headers.get("content-type")?.startsWith("multipart/form-data;"))
       return response({ error: "Use the upload form to choose a file." }, 400);
-    const form = await new Response(await boundedBytes(r, 600000), {
-      headers: { "Content-Type": r.headers.get("Content-Type") || "" },
-    })
+    const form = await new Response(
+      await boundedBytes(r, MAX_MEDIA_BYTES + 65536),
+      {
+        headers: { "Content-Type": r.headers.get("Content-Type") || "" },
+      },
+    )
       .formData()
       .catch(() => null);
     if (!form) return response({ error: "The upload form is invalid." }, 400);
     const f = form.get("file");
     const resume = form.get("purpose") === "resume";
-    if (!(f instanceof File) || f.size > 524288 || f.size === 0)
-      return response({ error: "Select a file under 512 KB." }, 400);
+    if (!(f instanceof File) || f.size > MAX_MEDIA_BYTES || f.size === 0)
+      return response(
+        { error: "Select a nonempty original file up to 4 MiB." },
+        400,
+      );
     const bytes = new Uint8Array(await f.arrayBuffer());
     const head = Array.from(bytes.slice(0, 12));
     const types: Record<string, boolean> = {

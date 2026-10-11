@@ -1,6 +1,12 @@
 "use client";
 import Image from "next/image";
-import { useState, useEffect, useRef, type CSSProperties } from "react";
+import {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  type CSSProperties,
+} from "react";
 import {
   ArrowUpRight,
   ArrowDown,
@@ -23,6 +29,7 @@ import {
   Command,
   Mail,
   MapPin,
+  ImageIcon,
 } from "lucide-react";
 import {
   Dialog,
@@ -42,6 +49,8 @@ import AiGuide from "./ai-guide";
 import CollectionSurfer from "./collection-surfer";
 import AchievementGallery from "./achievement-gallery";
 import LiveBackground from "./live-background";
+import ScrollStory from "./scroll-story";
+import EvidenceViewer from "./evidence-viewer";
 import { useBrowserPreference } from "@/hooks/use-browser-preference";
 
 export default function Portfolio({
@@ -55,6 +64,8 @@ export default function Portfolio({
     p = c.profile,
     s = c.settings;
   const [menu, setMenu] = useState(false),
+    [evidence, setEvidence] = useState<Entry | null>(null),
+    [introActive, setIntroActive] = useState(s.introEnabled === "on"),
     [selected, setSelected] = useState<Entry | null>(null),
     [search, setSearch] = useState(false),
     [query, setQuery] = useState(""),
@@ -67,6 +78,10 @@ export default function Portfolio({
   const root = useRef<HTMLElement>(null),
     progress = useRef<HTMLDivElement>(null),
     tracked = useRef(false);
+  const changeIntroActive = useCallback(
+    (active: boolean) => setIntroActive(active),
+    [],
+  );
   const navigation = [
     { id: "home", label: "Intro", show: true },
     { id: "work", label: "Work", show: c.sections.projects },
@@ -250,6 +265,7 @@ export default function Portfolio({
       data-visual={s.visualTheme}
       data-background={s.liveBackground}
       data-motion={s.motion}
+      data-intro-active={s.introEnabled === "on" && introActive}
       style={
         {
           "--folio-accent": s.accent,
@@ -265,6 +281,13 @@ export default function Portfolio({
         Skip to content
       </a>
       <div className="reading-progress" ref={progress} aria-hidden />
+      {s.introEnabled === "on" && (
+        <ScrollStory
+          settings={s}
+          name={p.name}
+          onActiveChange={changeIntroActive}
+        />
+      )}
       {preview && (
         <div className="preview-banner">
           Draft preview · Only visible to you{" "}
@@ -557,6 +580,14 @@ export default function Portfolio({
                     <h3>{x.title}</h3>
                     <p className="journey-role">{x.subtitle}</p>
                     <p>{x.description}</p>
+                    {(x.media || x.image) && (
+                      <button
+                        className="underlink evidence-open"
+                        onClick={() => setEvidence(x)}
+                      >
+                        <ImageIcon size={17} /> View work proof
+                      </button>
+                    )}
                     {x.link && (
                       <a
                         className="underlink"
@@ -625,23 +656,23 @@ export default function Portfolio({
                     <span>{x.subtitle}</span>
                     <ArrowUpRight size={20} />
                   </div>
-                  <h3>{x.title}</h3>
+                  <h3>
+                    <button
+                      className="credential-open"
+                      onClick={() => setEvidence(x)}
+                    >
+                      {x.title}
+                    </button>
+                  </h3>
                   <p>{x.description}</p>
                   <div className="credential-foot">
                     <span>{x.period}</span>
-                    {x.link && (
-                      <a
-                        className="underlink"
-                        href={x.link}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        {x.link.includes("credly")
-                          ? "View badge"
-                          : "View on LinkedIn"}
-                        <ArrowUpRight size={15} />
-                      </a>
-                    )}
+                    <button
+                      className="underlink"
+                      onClick={() => setEvidence(x)}
+                    >
+                      View certificate <ImageIcon size={15} />
+                    </button>
                   </div>
                 </article>
               ))}
@@ -896,6 +927,7 @@ export default function Portfolio({
             </button>
           </div>
         )}
+      <EvidenceViewer entry={evidence} onClose={() => setEvidence(null)} />
       <Dialog open={search} onOpenChange={setSearch}>
         <DialogContent className="folio-search">
           <DialogTitle>

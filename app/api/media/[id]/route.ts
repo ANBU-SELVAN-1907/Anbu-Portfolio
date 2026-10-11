@@ -14,7 +14,7 @@ export async function GET(
       return response({ error: "Not found" }, 404);
     const f = await bucket().get(id);
     if (!f) return new Response("Not found", { status: 404 });
-    return new Response(f.body, {
+    return new Response(new Uint8Array(f.body).buffer, {
       headers: {
         "Content-Type":
           f.httpMetadata?.contentType || "application/octet-stream",

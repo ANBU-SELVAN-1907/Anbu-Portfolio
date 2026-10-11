@@ -35,12 +35,16 @@ async function compile(file, target, replacements = {}) {
     }).outputText,
   );
 }
+await compile("lib/media.ts", "media-limits.mjs");
+await compile("lib/hero-story.ts", "hero-story.mjs");
 await compile("lib/firebase.ts", "firebase.mjs", {
   '"./env"': '"./env.mjs"',
+  '"./media"': '"./media-limits.mjs"',
 });
 await compile("lib/content.ts", "content.mjs");
 await compile("lib/editorial.ts", "editorial.mjs", {
   '"./content"': '"./content.mjs"',
+  '"./hero-story"': '"./hero-story.mjs"',
 });
 await compile("lib/validation.ts", "validation.mjs", {
   '"./editorial"': '"./editorial.mjs"',
@@ -51,6 +55,7 @@ await fs.writeFile(
 );
 await compile("lib/firebase-server.ts", "server.mjs", {
   '"./env"': '"./env.mjs"',
+  '"./media"': '"./media-limits.mjs"',
   '"./editorial"': '"./editorial.mjs"',
   '"./firebase"': '"./firebase.mjs"',
   '"./firebase-auth"': '"./auth.mjs"',
@@ -70,6 +75,7 @@ await compile("app/api/resume/route.ts", "resume.mjs", {
   '"@/lib/pdf"': '"./pdf.mjs"',
 });
 await compile("app/api/media/route.ts", "media.mjs", {
+  '"@/lib/media"': '"./media-limits.mjs"',
   '"@/lib/server"': '"./server.mjs"',
 });
 await compile("app/api/contact/route.ts", "contact.mjs", {
@@ -193,9 +199,29 @@ try {
     ).fields.body.stringValue.length < 1048487,
   );
   await assert.rejects(() =>
-    firebaseBucket.put("large", new Uint8Array(524289), {
+    firebaseBucket.put("large", new Uint8Array(4194305), {
       httpMetadata: { contentType: "image/png" },
     }),
+  );
+  const original = new Uint8Array(
+    await fs.readFile("public/hero-frames/01-eye.png"),
+  );
+  await firebaseBucket.put("original", original, {
+    httpMetadata: { contentType: "image/png" },
+  });
+  assert.deepEqual((await firebaseBucket.get("original")).body, original);
+  const chunkPath =
+    "projects/test-project/databases/(default)/documents/portfolio_file_chunks/original:";
+  const chunk = records.get(chunkPath + "0");
+  const saved = chunk.fields.body.stringValue;
+  chunk.fields.body.stringValue = "AAAA";
+  await assert.rejects(() => firebaseBucket.get("original"));
+  chunk.fields.body.stringValue = saved;
+  await firebaseBucket.delete("original");
+  assert.equal(await firebaseBucket.get("original"), null);
+  assert.equal(
+    [...records.keys()].filter((x) => x.startsWith(chunkPath)).length,
+    0,
   );
   await firebaseBucket.delete("file");
   assert.equal(await firebaseBucket.get("file"), null);
@@ -309,6 +335,14 @@ try {
   content.sections.gallery = false;
   assert.equal(isPublishedMedia(content, "file"), false);
 
+  content.experience[0].media = "/api/media/proof";
+  assert.equal(isPublishedMedia(content, "proof"), true);
+  content.experience[0].visible = false;
+  assert.equal(isPublishedMedia(content, "proof"), false);
+  content.experience[0].visible = true;
+  content.sections.experience = false;
+  assert.equal(isPublishedMedia(content, "proof"), false);
+
   const { POST: sendEmail } = await import(
     pathToFileURL(path.join(out, "email.mjs"))
   );
@@ -347,7 +381,7 @@ try {
             Origin: "https://example.test",
             "Content-Type": "multipart/form-data; boundary=test",
           },
-          body: "x".repeat(600001),
+          body: "x".repeat(4259841),
         }),
       )
     ).status,
@@ -514,8 +548,26 @@ try {
     "Resume PDF upload, PDF-only enforcement, private draft preview, public isolation and byte-for-byte published download passed.",
   );
   console.log(
-    "Firestore REST encoding, transactions/conflict retry, atomic limits, 512 KiB files, private media, admin draft/publish/restore, origin and stale-revision checks passed (mock transport).",
+    "Firestore REST encoding, transactions/conflict retry, atomic limits, 4 MiB original files with chunk integrity, private media, admin draft/publish/restore, origin and stale-revision checks passed (mock transport).",
   );
+  const { env: runtimeEnv } = await import(pathToFileURL(path.join(out, "env.mjs")));
+  const savedCredential = runtimeEnv.FIREBASE_SERVICE_ACCOUNT_JSON;
+  async function freshHealth(suffix) {
+    const runtime = await import(pathToFileURL(path.join(out, "firebase.mjs")) + "?health=" + suffix);
+    return runtime.firebaseHealth();
+  }
+  runtimeEnv.FIREBASE_SERVICE_ACCOUNT_JSON = "malformed";
+  let health = await freshHealth("invalid"); assert.equal(health.ok, false); assert.match(health.message, /complete JSON/);
+  runtimeEnv.FIREBASE_SERVICE_ACCOUNT_JSON = JSON.stringify({...JSON.parse(savedCredential), project_id: "wrong-project"});
+  health = await freshHealth("mismatch"); assert.equal(health.ok, false); assert.match(health.message, /different project/);
+  runtimeEnv.FIREBASE_SERVICE_ACCOUNT_JSON = savedCredential;
+  health = await freshHealth("valid"); assert.equal(health.ok, true);
+  const transport = globalThis.fetch;
+  for (const [status, message, expected] of [[403, "permission denied", /Cloud Datastore User/], [404, "The database (default) does not exist", /Create the/], [429, "quota", /quota/]]) {
+    globalThis.fetch = async (url, init) => new URL(url).hostname === "firestore.googleapis.com" ? Response.json({error:{message}}, {status}) : transport(url, init);
+    health = await freshHealth(String(status)); assert.equal(health.ok, false); assert.match(health.message, expected);
+  }
+  console.log("Firebase readiness diagnoses malformed keys, project mismatch, IAM denial, missing database and quotas without exposing credentials.");
 } finally {
   globalThis.fetch = realFetch;
 }

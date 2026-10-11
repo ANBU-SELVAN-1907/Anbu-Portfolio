@@ -32,6 +32,10 @@ const item = z
     link: url,
     code: url,
     visible: z.boolean(),
+    media: url.default(""),
+    credentialId: text.default(""),
+    issued: text.default(""),
+    expires: text.default(""),
   })
   .strict();
 const list = z
@@ -104,6 +108,23 @@ export const contentSchema = z
       .optional(),
     settings: z
       .object({
+        introEnabled: z.enum(["on", "off"]).default("on"),
+        introGreeting: text.default(editorialSettings.introGreeting),
+        introMiddle: text.default(editorialSettings.introMiddle),
+        introFinal: text.default(editorialSettings.introFinal),
+        introFrames: text
+          .default(editorialSettings.introFrames)
+          .refine((value) => {
+            const frames = value
+              .split("\n")
+              .map((s) => s.trim())
+              .filter(Boolean);
+            return (
+              frames.length >= 2 &&
+              frames.length <= 40 &&
+              frames.every((frame) => url.safeParse(frame).success)
+            );
+          }, "Use 2–40 HTTPS or local frame URLs, one per line."),
         visualTheme: z
           .enum(["editorial", "noir", "aurora"])
           .default("editorial"),

@@ -20,8 +20,12 @@ async function compile(name, replacements = {}) {
     }).outputText,
   );
 }
+await compile("hero-story");
 await compile("content");
-await compile("editorial", { '"./content"': '"./content.mjs"' });
+await compile("editorial", {
+  '"./content"': '"./content.mjs"',
+  '"./hero-story"': '"./hero-story.mjs"',
+});
 await fs.writeFile(path.join(out, "env.mjs"), "export const env={};");
 await fs.writeFile(
   path.join(out, "auth.mjs"),

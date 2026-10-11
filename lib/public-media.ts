@@ -16,7 +16,7 @@ export function isPublishedMedia(content: Content, id: string) {
     if (!content.sections[collection]) continue;
     if (
       content[collection]?.some(
-        (x) => x.visible && [x.image, x.link, x.code].includes(path),
+        (x) => x.visible && [x.image, x.media, x.link, x.code].includes(path),
       )
     )
       return true;

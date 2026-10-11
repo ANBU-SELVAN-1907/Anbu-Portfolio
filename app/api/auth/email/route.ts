@@ -1,4 +1,8 @@
-import { firebaseConfig, firebaseReady } from "@/lib/firebase";
+import {
+  firebaseConfig,
+  firebaseReady,
+  firebaseSetupMessage,
+} from "@/lib/firebase";
 import {
   requestFailure,
   response,
@@ -62,7 +66,8 @@ export async function POST(r: Request) {
           error: reason.includes("OPERATION_NOT_ALLOWED")
             ? "Enable Email/Password and Email link (passwordless) in Firebase Authentication → Sign-in method."
             : reason.includes("UNAUTHORIZED_DOMAIN") ||
-                reason.includes("INVALID_CONTINUE_URI")
+                reason.includes("INVALID_CONTINUE_URI") ||
+                reason.includes("UNAUTHORIZED_CONTINUE_URI")
               ? "Add this website hostname to Firebase Authentication → Authorized domains."
               : reason.includes("TOO_MANY_ATTEMPTS") ||
                   reason.includes("QUOTA_EXCEEDED")
@@ -83,7 +88,8 @@ export async function POST(r: Request) {
     return response(
       {
         error:
-          "The sign-in email could not be sent. Check the Firebase server configuration and try again.",
+          firebaseSetupMessage(e) ||
+          "The sign-in service could not connect. Retry shortly; if this continues, check the Firebase server configuration.",
       },
       503,
     );

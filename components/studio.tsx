@@ -52,6 +52,7 @@ import {
   Eye,
   Upload,
 } from "lucide-react";
+import { MAX_MEDIA_BYTES } from "@/lib/media";
 import { entry, type Content } from "@/lib/content";
 import { contentSchema } from "@/lib/validation";
 import {
@@ -190,6 +191,15 @@ Object.assign(labels, {
   visualTheme: "Visual theme (editorial, noir, aurora)",
   liveBackground: "Live background",
   builder: "Show resume builder app",
+  introEnabled: "Fullscreen scroll introduction",
+  introGreeting: "Intro greeting",
+  introMiddle: "Intro middle saying",
+  introFinal: "Intro closing line",
+  introFrames: "Ordered intro frames (one URL per line)",
+  media: "Supporting proof (image or PDF)",
+  credentialId: "Credential ID",
+  issued: "Issued date",
+  expires: "Expiry date (optional)",
   galleryTitle: "Gallery headline",
   galleryNote: "Gallery introduction",
 });
@@ -208,10 +218,22 @@ const collectionFields: Record<Collection, string[]> = {
     "code",
   ],
   skills: ["title", "description", "tags"],
-  experience: ["title", "subtitle", "period", "description", "tags", "link"],
+  experience: [
+    "title",
+    "subtitle",
+    "period",
+    "description",
+    "tags",
+    "media",
+    "link",
+  ],
   education: ["title", "subtitle", "period", "description", "tags", "link"],
   testimonials: ["title", "subtitle", "description"],
   certifications: [
+    "media",
+    "credentialId",
+    "issued",
+    "expires",
     "title",
     "subtitle",
     "period",
@@ -221,6 +243,10 @@ const collectionFields: Record<Collection, string[]> = {
   ],
   faq: ["title", "description"],
   gallery: [
+    "media",
+    "credentialId",
+    "issued",
+    "expires",
     "title",
     "subtitle",
     "period",
@@ -232,6 +258,7 @@ const collectionFields: Record<Collection, string[]> = {
   customSections: ["title", "subtitle", "description", "image", "link", "tags"],
 };
 const longFields = [
+  "introFrames",
   "headline",
   "intro",
   "bio",
@@ -506,9 +533,9 @@ export default function Studio({ email }: { email: string }) {
     }
   }
   async function upload(file: File, purpose = "media") {
-    if (file.size > 524288)
+    if (file.size > MAX_MEDIA_BYTES)
       throw Error(
-        "Keep uploads under 512 KB for free Firebase storage. Compress the image or PDF first.",
+        "Choose an original file up to 4 MiB. Files are stored without compression.",
       );
     const form = new FormData();
     form.append("file", file);
@@ -592,7 +619,7 @@ export default function Studio({ email }: { email: string }) {
                   : value || "No resume selected")}
           </strong>
           <small>
-            PDF only · maximum 512 KiB for the strict free Firebase setup. Draft
+            PDF only · maximum 4 MiB for the strict free Firebase setup. Draft
             uploads remain private until published.
           </small>
           <div className="field-tools">
@@ -611,7 +638,7 @@ export default function Studio({ email }: { email: string }) {
         </div>
       );
     }
-    const file = ["photo", "image"].includes(key);
+    const file = ["photo", "image", "media"].includes(key);
     return (
       <label
         className={longFields.includes(key) ? "field wide" : "field"}
@@ -661,7 +688,7 @@ export default function Studio({ email }: { email: string }) {
             <button
               type="button"
               onClick={() => {
-                setPickerKind("image");
+                setPickerKind(key === "media" ? "proof" : "image");
                 setPicker(() => onChange);
               }}
             >
@@ -1407,7 +1434,7 @@ export default function Studio({ email }: { email: string }) {
             <TabsContent value="media">
               <div className="editor-intro">
                 <p>
-                  PNG, JPEG, WebP and PDF · Up to 512 KB per file.
+                  PNG, JPEG, WebP and PDF · Up to 4 MiB per file.
                   <br />
                   Files become public when used in published content.
                 </p>
@@ -1660,7 +1687,9 @@ export default function Studio({ email }: { email: string }) {
           <DialogTitle>
             {pickerKind === "resume"
               ? "Choose a resume PDF"
-              : "Choose an image"}
+              : pickerKind === "proof"
+                ? "Choose supporting proof"
+                : "Choose an image"}
           </DialogTitle>
           <DialogDescription>
             Select an uploaded file, or upload one now.
@@ -1670,7 +1699,9 @@ export default function Studio({ email }: { email: string }) {
             accept={
               pickerKind === "resume"
                 ? ".pdf,application/pdf"
-                : "image/png,image/jpeg,image/webp"
+                : pickerKind === "proof"
+                  ? "image/png,image/jpeg,image/webp,application/pdf"
+                  : "image/png,image/jpeg,image/webp"
             }
             disabled={busy}
             onChange={(e) => {
@@ -1691,7 +1722,7 @@ export default function Studio({ email }: { email: string }) {
               .filter((m) =>
                 pickerKind === "resume"
                   ? m.type === "application/pdf"
-                  : m.type.startsWith("image/"),
+                  : pickerKind === "proof" || m.type.startsWith("image/"),
               )
               .map((m) => (
                 <button

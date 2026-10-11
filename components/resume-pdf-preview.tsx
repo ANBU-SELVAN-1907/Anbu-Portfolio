@@ -1,6 +1,14 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-export default function ResumePdfPreview({ url }: { url: string }) {
+export default function ResumePdfPreview({
+  url,
+  bytes,
+  label = "Resume PDF",
+}: {
+  url?: string;
+  bytes?: Uint8Array;
+  label?: string;
+}) {
   const root = useRef<HTMLDivElement>(null),
     [status, setStatus] = useState("Rendering exact PDF pages…");
   useEffect(() => {
@@ -11,7 +19,9 @@ export default function ResumePdfPreview({ url }: { url: string }) {
         const pdfjs = await import("pdfjs-dist");
         pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
         const task = pdfjs.getDocument({
-          data: new Uint8Array(await (await fetch(url)).arrayBuffer()),
+          data: bytes
+            ? bytes.slice()
+            : new Uint8Array(await (await fetch(url!)).arrayBuffer()),
         });
         loading = task;
         const doc = await task.promise;
@@ -26,7 +36,7 @@ export default function ResumePdfPreview({ url }: { url: string }) {
           if (!context) throw Error("Canvas preview unavailable.");
           canvas.width = viewport.width;
           canvas.height = viewport.height;
-          canvas.setAttribute("aria-label", `Resume PDF page ${index}`);
+          canvas.setAttribute("aria-label", `${label} page ${index}`);
           canvas.setAttribute("role", "img");
           root.current?.appendChild(canvas);
           await page.render({ canvas, canvasContext: context, viewport })
@@ -34,7 +44,7 @@ export default function ResumePdfPreview({ url }: { url: string }) {
         }
         if (!cancelled)
           setStatus(
-            `${doc.numPages} exact PDF page(s). Use Text & parser for the accessible text version.`,
+            `${doc.numPages} PDF page(s). ${label === "Resume PDF" ? "Use Text & parser for the accessible text version." : "Open the original document for its text and details."}`,
           );
       } catch {
         if (!cancelled)
@@ -48,7 +58,7 @@ export default function ResumePdfPreview({ url }: { url: string }) {
       cancelled = true;
       loading?.destroy().catch(() => {});
     };
-  }, [url]);
+  }, [url, bytes, label]);
   return (
     <div className="resume-pdf-preview">
       <p role="status">{status}</p>

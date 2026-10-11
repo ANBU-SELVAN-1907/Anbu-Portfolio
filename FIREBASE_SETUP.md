@@ -2,7 +2,7 @@
 
 This configuration uses **Firebase Spark**, email-link/Google sign-in, and Cloud Firestore. It does not use Cloud Storage, Cloud Functions, App Hosting, SMS authentication, or paid Identity Platform MFA. Do not upgrade to Blaze for this implementation.
 
-## What is free? Checked 6 October 2026
+## What is free? Checked 11 October 2026
 
 | Service                        | Included allowance                                                                                               |
 | ------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
@@ -12,7 +12,7 @@ This configuration uses **Firebase Spark**, email-link/Google sign-in, and Cloud
 
 Sources: [Firestore pricing](https://firebase.google.com/docs/firestore/pricing), [Firebase pricing](https://firebase.google.com/pricing). Provider policies can change. On Spark, exceeding a quota can make a service unavailable; the app does not automatically upgrade the plan.
 
-**File tradeoff:** Cloud Storage now requires Blaze, so this app stores small uploads inside private Firestore documents. Each upload is limited to **512 KiB**, with base64 encoding using about one-third more database space. Files share the 1 GiB database allowance with content, history, metrics, and messages. Large photos/PDFs should be compressed or bundled as website assets. The original portrait remains a bundled file and is unchanged. Firestore is adequate for a small portfolio's lightweight uploads, not a general large-file storage service.
+**File tradeoff:** Cloud Storage now requires Blaze, so this app stores small uploads inside private Firestore documents. Each upload is limited to **4 MiB**, with base64 encoding using about one-third more database space. Files share the 1 GiB database allowance with content, history, metrics, and messages. Files up to 4 MiB are preserved byte-for-byte and split into 512 KiB chunks, committed atomically with a SHA-256 integrity digest. Larger files can be bundled as website assets. The original portrait remains a bundled file and is unchanged. Firestore is adequate for a small portfolio's lightweight uploads, not a general large-file storage service.
 
 ## 1. Create the Firebase project
 
@@ -52,7 +52,7 @@ This is **not app-enforced Firebase OTP**. Firebase TOTP/SMS MFA requires Identi
 2. Choose **Standard edition**, the `(default)` database, and **Production mode**.
 3. Choose a suitable location (for example Mumbai for visitors in India). Location cannot be casually changed later.
 4. Open **Rules**, replace the rules with `firebase/firestore.rules`, then publish them. These deny all browser/direct client reads and writes.
-5. Add single-field index exemptions from `firebase/firestore.indexes.json`: `draft` and `published` in `portfolio_content`, `payload` in `portfolio_history`, and `body` in `portfolio_files`. Disable ascending, descending, and array indexing for these large fields. This avoids indexed string truncation and unnecessary index storage.
+5. Add single-field index exemptions from `firebase/firestore.indexes.json`: `draft` and `published` in `portfolio_content`, `payload` in `portfolio_history`, and `body` in both `portfolio_files` and `portfolio_file_chunks`. Disable ascending, descending, and array indexing for these large fields. This avoids indexed string truncation and unnecessary index storage.
 
 The backend uses fixed `portfolio_*` collections. Firestore's automatic single-field indexes cover list queries; no composite index is required. Drafts and inbox messages are never returned by public endpoints.
 
@@ -77,7 +77,7 @@ Check these cases on your configured project:
 - Correct Google account opens the studio; a different account is denied.
 - Draft changes do not alter the public portfolio until Publish.
 - Revoke refresh tokens or disable the account; subsequent admin requests fail.
-- Upload a file under 512 KiB, publish it in the gallery, then verify it on the public page. An unused/unpublished upload must return 404 to visitors.
+- Upload a file under 4 MiB, publish it in the gallery, then verify it on the public page. An unused/unpublished upload must return 404 to visitors.
 - Try stale revisions from two studio tabs; the stale update must be rejected.
 - Submit a contact message and review it in the owner's inbox.
 
@@ -94,11 +94,11 @@ Production uses `__Host-anbu_owner`, `Secure`, `HttpOnly`, and `SameSite=Strict`
 ### Publish your uploaded resume
 
 1. Admin → **Resume download** → **Upload / replace resume**.
-2. Choose a PDF up to **512 KiB**. It is stored privately in Firestore.
+2. Choose a PDF up to **4 MiB**. It is stored privately in Firestore.
 3. Download the draft PDF to check it, then **Save draft → Publish**.
 4. Visitors clicking **Get my resume** receive the exact published PDF. Uploading a replacement does not change the public PDF until you publish.
 
-The automatic PDF remains an optional fallback. Large resumes must be compressed first, or a larger original can be bundled as `/resume.pdf` through the source repository. File bytes in Firestore use about one-third extra space for encoding.
+The automatic PDF remains an optional fallback. A larger original can be bundled as `/resume.pdf` through the source repository. File bytes in Firestore use about one-third extra space for encoding.
 
 ## Existing data and maintenance
 
@@ -113,3 +113,19 @@ Use Vercel Hobby for this personal, non-commercial portfolio and its free subdom
 Keep Firebase on Spark with no linked billing account. Firestore's free quotas are shared by text, uploads, history, inbox and analytics. Cloud Storage requires Blaze and is excluded. [Firebase Storage billing requirement](https://firebase.google.com/docs/storage/faqs-storage-changes-announced-sept-2024)
 
 Optional chat/AI writing needs a Google AI Studio key in a free-tier project. Availability and request quotas are provider-controlled; do not link paid billing. Resume editing, analysis and PDF/DOCX downloads work without AI. [Gemini pricing](https://ai.google.dev/gemini-api/docs/pricing)
+
+## Troubleshooting the live admin login
+
+Open `/api/auth/config` on the deployed site. `ready: true` now means the server successfully authenticated to Google and opened/rolled back a Firestore transaction; it is no longer only an environment-variable presence check. The diagnostic is cached for one minute and never exposes the private key.
+
+If it reports a project mismatch, generate a JSON key for **anbu-portfolio-b91f6**, then Vercel → Project → Settings → Environment Variables → replace **FIREBASE_SERVICE_ACCOUNT_JSON** for **Production** with the complete JSON contents. Do not include `.env` assignment syntax or surrounding shell quotes in Vercel. Redeploy from Deployments after saving. The public `FIREBASE_PROJECT_ID` must match the private JSON's `project_id`.
+
+If access is denied, Google Cloud Console → IAM → select this project → grant the credential's service account **Cloud Datastore User**. Check that Cloud Firestore API is enabled. Keep the deny-all browser rules. If the database is missing, create Standard `(default)` in Firebase → Firestore Database. Wait one minute and reload `/admin` after fixing configuration.
+
+Email link sign-in additionally needs Email/Password + Email link enabled and `anbu-portfolio-seven.vercel.app` in Authentication → Settings → Authorized domains. Check the current provider settings before sending a new link; Spark allows only five sign-in emails daily.
+
+## Intro and supporting proof
+
+Site settings controls the fullscreen introduction, its three typed lines, and ordered frame URLs. The eleven bundled PNGs remain byte-identical to the originals; `public/hero-frames/manifest.json` records their hashes. Reduced-motion visitors see the final pose. The rest of the site's chapters and theme remain independent.
+
+Experience → Supporting proof accepts an original office photo or PDF. Certifications and gallery entries also support proof, credential ID, issued date, expiry, and a verification URL. Save the draft and Publish to make new proof public. Hidden entries/chapters keep their uploads private. The popup shows the original image or PDF pages beside metadata; it does not automatically redirect visitors to LinkedIn.

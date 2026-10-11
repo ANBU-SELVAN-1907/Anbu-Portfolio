@@ -64,15 +64,17 @@ export default function FirebaseLogin() {
         if (!response.ok) throw Error("Could not load sign-in settings.");
         const d = (await response.json()) as {
           ready: boolean;
+          setupMessage?: string;
           authReady: boolean;
           config: Config;
         };
         if (!d.ready) {
           if (active)
             setSetup(
-              d.authReady
-                ? "Firebase web settings are connected, but the private backend credential is missing. Add FIREBASE_SERVICE_ACCOUNT_JSON to .env.local locally and to Vercel’s Production environment, then restart or redeploy. See FIREBASE_SETUP.md, step 4."
-                : "Firebase is not configured. Add the web settings and private backend credential described in FIREBASE_SETUP.md.",
+              d.setupMessage ||
+                (d.authReady
+                  ? "Firebase web settings are connected, but the private backend credential is missing. Add FIREBASE_SERVICE_ACCOUNT_JSON to .env.local locally and to Vercel’s Production environment, then restart or redeploy. See FIREBASE_SETUP.md, step 4."
+                  : "Firebase is not configured. Add the web settings and private backend credential described in FIREBASE_SETUP.md."),
             );
           return;
         }

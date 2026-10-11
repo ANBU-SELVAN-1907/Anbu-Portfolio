@@ -12,6 +12,10 @@ export type Entry = {
   link: string;
   code: string;
   visible: boolean;
+  media?: string;
+  credentialId?: string;
+  issued?: string;
+  expires?: string;
 };
 export type Content = {
   profile: Record<string, string>;
@@ -41,6 +45,10 @@ export const entry = (v: Partial<Entry>): Entry => ({
   link: "",
   code: "",
   visible: true,
+  media: "",
+  credentialId: "",
+  issued: "",
+  expires: "",
   ...v,
 });
 export const initialContent: Content = {

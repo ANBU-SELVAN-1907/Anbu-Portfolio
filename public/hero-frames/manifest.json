@@ -1,0 +1,57 @@
+[
+  {
+    "file": "01-eye.png",
+    "bytes": 2424448,
+    "sha256": "ef62c9befbcf9094e6578aa56bcfd6b81a79eb4337422f15b77dd8c4059ee49f"
+  },
+  {
+    "file": "02-eyes.png",
+    "bytes": 2555560,
+    "sha256": "ca38c23b4ec6cf1c9f5b3f62f5733b4bc7f15fd7a087b7078d8f3576901e9b74"
+  },
+  {
+    "file": "03-smile-start.png",
+    "bytes": 2254604,
+    "sha256": "f573ed9a97ab5d826d82c9101f6b03b178bcd6642abddbb2f16a64020a3c8d8c"
+  },
+  {
+    "file": "04-smile.png",
+    "bytes": 2193245,
+    "sha256": "a937bd33f67ae87e24f735f3fb94e6a6f79d82823674e3eaccf0e38738fe0718"
+  },
+  {
+    "file": "05-arm-start.png",
+    "bytes": 2218434,
+    "sha256": "c1ba4d6db5c3e220e1f61ef4bd39744cc8eb9a90bcf239fcf517765ee0181129"
+  },
+  {
+    "file": "06-arm-raise.png",
+    "bytes": 2163646,
+    "sha256": "f7358eee852100583fb0774df960f1410c4a29fc4238e1cc1e0739eef7a13211"
+  },
+  {
+    "file": "07-hand-under-chin-close.png",
+    "bytes": 2195814,
+    "sha256": "15aeaaa8353c18b9b16345416e6fc806762b1cfa43391addae3a588e8287a5da"
+  },
+  {
+    "file": "08-hand-under-chin.png",
+    "bytes": 1776536,
+    "sha256": "e6321926bd41a12b56e1c07b768c27981225951c4822f04fa6859731c3f2cb33"
+  },
+  {
+    "file": "09-sweep-start.png",
+    "bytes": 1770862,
+    "sha256": "62a286b9bd9094d5031c780566138be22827e608ca918e978f14a813950a1a29"
+  },
+  {
+    "file": "10-sweep-middle.png",
+    "bytes": 1750885,
+    "sha256": "9e4e8079d9a3ce70d5ca99963d80dd7512e972b0988b0eabf953151bf7508dac"
+  },
+  {
+    "file": "11-finishing-pose.png",
+    "bytes": 1783900,
+    "sha256": "2470dfa86758c74d8df4e4b407daba7c3654dc9c9d09eae3a6e69445f0fb59c3"
+  }
+]

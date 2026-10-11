@@ -1,7 +1,13 @@
 import { entry, initialContent, type Content } from "./content";
+import { originalHeroFrames } from "./hero-story";
 
 // Content defaults are versioned separately from presentation. Existing edits survive.
 export const editorialSettings = {
+  introEnabled: "on",
+  introGreeting: "Hi, welcome.",
+  introMiddle: "Curiosity. Turned into something real.",
+  introFinal: "This is Anbu Selvan.",
+  introFrames: originalHeroFrames.join("\n"),
   visualTheme: "editorial",
   liveBackground: "on",
   galleryTitle: "Moments that moved me forward.",
@@ -94,6 +100,12 @@ export const starterFaq = [
 export function normalizeContent(c: Content): Content {
   return {
     ...c,
+    projects: c.projects.map(entry),
+    skills: c.skills.map(entry),
+    experience: c.experience.map(entry),
+    education: c.education.map(entry),
+    testimonials: c.testimonials.map(entry),
+    certifications: c.certifications.map(entry),
     profile: {
       ...c.profile,
       ...(c.profile.name === "Anbu Selvan" && c.profile.surname === "T"
@@ -102,9 +114,9 @@ export function normalizeContent(c: Content): Content {
     },
     settings: { ...editorialSettings, ...c.settings },
     sections: { faq: true, gallery: true, customSections: true, ...c.sections },
-    faq: c.faq ?? starterFaq,
-    gallery: c.gallery ?? [],
-    customSections: c.customSections ?? [],
+    faq: (c.faq ?? starterFaq).map(entry),
+    gallery: (c.gallery ?? []).map(entry),
+    customSections: (c.customSections ?? []).map(entry),
   };
 }
 export function newEditorialContent(c: Content = initialContent): Content {

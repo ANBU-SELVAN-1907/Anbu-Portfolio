@@ -18,7 +18,7 @@ The browser receives a short-lived HttpOnly session cookie, Secure with the __Ho
 
 Content is a strict versioned schema. Draft saves and publishes use Firestore transactions with revision checks. Publishing atomically writes live content and its history snapshot. Only public, enabled, visible content exposes file links. The owner can restore snapshots into a draft; publishing is a separate action. Up to 20 published versions are retained.
 
-Spark-compatible uploads use private Firestore documents, capped at 512 KiB. Binary files are base64 encoded, share database storage, and never use Cloud Storage. Uploads have bounded request streams and signature/type checks. API access determines whether a file is published. Deletion refuses current and retained-history references. This is a deliberate small-portfolio tradeoff; large media belong in bundled assets or a future object-store adapter.
+Spark-compatible uploads use private Firestore documents, capped at 4 MiB. Binary files are base64 encoded, share database storage, and never use Cloud Storage. Uploads have bounded request streams and signature/type checks. API access determines whether a file is published. Deletion refuses current and retained-history references. This is a deliberate small-portfolio tradeoff; large media belong in bundled assets or a future object-store adapter.
 
 ## Public presentation
 
