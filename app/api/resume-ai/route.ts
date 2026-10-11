@@ -1,3 +1,4 @@
+import { requestFailure } from "@/lib/server";
 import { env } from "@/lib/env";
 import { z } from "zod";
 import {
@@ -117,7 +118,9 @@ export async function POST(r: Request) {
         422,
       );
     return response({ ...parsed.data, requiresReview: true });
-  } catch {
+  } catch (e) {
+    const failure = requestFailure(e);
+    if (failure) return failure;
     return response(
       { error: "AI could not respond. Your resume is unchanged." },
       503,

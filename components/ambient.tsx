@@ -88,7 +88,8 @@ export default function Ambient({ enabled }: { enabled: boolean }) {
             const wave = Math.sin(angle * 2 + time * 0.7 + ribbon) * 5;
             const x = Math.cos(angle) * radius;
             const y = Math.sin(angle) * radius * (0.28 + ribbon * 0.015) + wave;
-            step === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+            if (step === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
           }
           ctx.strokeStyle = `rgba(133, 157, 255, ${0.07 - ribbon * 0.006})`;
           ctx.lineWidth = ribbon === 2 ? 1.4 : 0.7;

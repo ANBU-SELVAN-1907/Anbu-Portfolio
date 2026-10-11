@@ -60,6 +60,25 @@ await compile("app/api/admin/route.ts", "admin.mjs", {
   '"@/lib/validation"': '"./validation.mjs"',
 });
 await compile("lib/public-media.ts", "public-media.mjs");
+await compile("app/api/auth/email/route.ts", "email.mjs", {
+  '"@/lib/server"': '"./server.mjs"',
+  '"@/lib/firebase"': '"./firebase.mjs"',
+});
+await compile("lib/pdf.ts", "pdf.mjs");
+await compile("app/api/resume/route.ts", "resume.mjs", {
+  '"@/lib/server"': '"./server.mjs"',
+  '"@/lib/pdf"': '"./pdf.mjs"',
+});
+await compile("app/api/media/route.ts", "media.mjs", {
+  '"@/lib/server"': '"./server.mjs"',
+});
+await compile("app/api/contact/route.ts", "contact.mjs", {
+  '"@/lib/server"': '"./server.mjs"',
+});
+await compile("app/api/analytics/route.ts", "analytics.mjs", {
+  '"@/lib/server"': '"./server.mjs"',
+});
+
 const records = new Map();
 let conflicts = 0,
   commits = 0,
@@ -72,6 +91,13 @@ globalThis.fetch = async (url, init = {}) => {
       : {};
   if (u.hostname === "oauth2.googleapis.com")
     return Response.json({ access_token: "test-token", expires_in: 3600 });
+  if (u.hostname === "identitytoolkit.googleapis.com") {
+    assert.equal(body.email, "anbu.t80555@gmail.com");
+    assert.equal(body.requestType, "EMAIL_SIGNIN");
+    assert.equal(body.continueUrl, "https://example.test/admin");
+    assert.equal(body.canHandleCodeInApp, true);
+    return Response.json({ email: body.email });
+  }
   assert.equal(u.hostname, "firestore.googleapis.com");
   assert.equal(init.headers.Authorization, "Bearer test-token");
   if (u.pathname.endsWith(":beginTransaction"))
@@ -206,6 +232,25 @@ try {
       }),
     );
   let state = await (await GET()).json();
+  for (const body of [
+    null,
+    [],
+    { action: "unknown" },
+    { action: "read", id: "../private" },
+    { action: "publish", revision: -1 },
+    { action: "publish", revision: 0, injected: true },
+  ])
+    assert.equal((await call(body)).status, 400);
+  const malformed = (body) =>
+    POST(
+      new Request("https://example.test/api/admin", {
+        method: "POST",
+        headers: { Origin: "https://example.test" },
+        body,
+      }),
+    );
+  assert.equal((await malformed("{")).status, 400);
+  assert.equal((await malformed("x".repeat(250001))).status, 413);
   const content = structuredClone(state.draft);
   content.profile.intro = "Test draft, never deployed.";
   assert.equal(
@@ -237,6 +282,10 @@ try {
   assert.equal((await call({ action: "publish", revision: 1 })).status, 200);
   state = await (await GET()).json();
   assert.equal(state.published.profile.intro, content.profile.intro);
+  assert.equal(
+    state.published.settings.lastUpdated,
+    new Date().toISOString().slice(0, 10),
+  );
   assert.equal(state.history.length, 1);
   assert.equal(
     (await call({ action: "restore", id: state.history[0].id, revision: 2 }))
@@ -259,6 +308,211 @@ try {
   assert.equal(isPublishedMedia(content, "file"), true);
   content.sections.gallery = false;
   assert.equal(isPublishedMedia(content, "file"), false);
+
+  const { POST: sendEmail } = await import(
+    pathToFileURL(path.join(out, "email.mjs"))
+  );
+  const send = async (
+    email = "anbu.t80555@gmail.com",
+    origin = "https://example.test",
+  ) =>
+    sendEmail(
+      new Request("https://example.test/api/auth/email", {
+        method: "POST",
+        headers: { Origin: origin },
+        body: JSON.stringify({ email }),
+      }),
+    );
+  assert.equal((await send("other@example.test")).status, 403);
+  assert.equal((await send(undefined, "https://other.example")).status, 403);
+  assert.equal((await send()).status, 200);
+  assert.equal((await send()).status, 200);
+  assert.equal((await send()).status, 200);
+  assert.equal((await send()).status, 429);
+  console.log(
+    "Owner-only email link sending, exact callback origin and resend limits passed (mock Firebase delivery).",
+  );
+  const { GET: downloadResume } = await import(
+    pathToFileURL(path.join(out, "resume.mjs"))
+  );
+  const { POST: uploadMedia } = await import(
+    pathToFileURL(path.join(out, "media.mjs"))
+  );
+  assert.equal(
+    (
+      await uploadMedia(
+        new Request("https://example.test/api/media", {
+          method: "POST",
+          headers: {
+            Origin: "https://example.test",
+            "Content-Type": "multipart/form-data; boundary=test",
+          },
+          body: "x".repeat(600001),
+        }),
+      )
+    ).status,
+    413,
+  );
+  assert.equal(
+    (
+      await uploadMedia(
+        new Request("https://example.test/api/media", {
+          method: "POST",
+          headers: {
+            Origin: "https://example.test",
+            "Content-Type": "application/json",
+          },
+          body: "{}",
+        }),
+      )
+    ).status,
+    400,
+  );
+  const originalBytes = new TextEncoder().encode(
+    "%PDF-1.4\nUploaded resume byte-for-byte test\n%%EOF",
+  );
+  const upload = async (file) => {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("purpose", "resume");
+    return uploadMedia(
+      new Request("https://example.test/api/media", {
+        method: "POST",
+        headers: { Origin: "https://example.test" },
+        body: form,
+      }),
+    );
+  };
+  assert.equal(
+    (await upload(new File(["wrong"], "test.png", { type: "image/png" })))
+      .status,
+    400,
+  );
+  const uploaded = await upload(
+    new File([originalBytes], "My-resume.pdf", { type: "application/pdf" }),
+  );
+  assert.equal(uploaded.status, 200);
+  const info = await uploaded.json();
+  state = await (await GET()).json();
+  const resumeContent = structuredClone(state.draft);
+  resumeContent.profile.resume = info.url;
+  assert.equal(
+    (
+      await call({
+        action: "save",
+        content: resumeContent,
+        revision: state.revision,
+      })
+    ).status,
+    200,
+  );
+  const publicBefore = await downloadResume(
+    new Request("https://example.test/api/resume"),
+  );
+  assert.notDeepEqual(
+    new Uint8Array(await publicBefore.arrayBuffer()),
+    originalBytes,
+  );
+  const draftPdf = await downloadResume(
+    new Request("https://example.test/api/resume?preview=1"),
+  );
+  assert.deepEqual(new Uint8Array(await draftPdf.arrayBuffer()), originalBytes);
+  setAllowed(false);
+  assert.equal(
+    (
+      await downloadResume(
+        new Request("https://example.test/api/resume?preview=1"),
+      )
+    ).status,
+    403,
+  );
+  setAllowed(true);
+  state = await (await GET()).json();
+  assert.equal(
+    (await call({ action: "publish", revision: state.revision })).status,
+    200,
+  );
+  const result = await downloadResume(
+    new Request("https://example.test/api/resume"),
+  );
+  assert.equal(result.status, 200);
+  assert.ok(result.headers.get("content-disposition").includes("attachment"));
+  assert.deepEqual(new Uint8Array(await result.arrayBuffer()), originalBytes);
+  const { POST: contact } = await import(
+    pathToFileURL(path.join(out, "contact.mjs"))
+  );
+  const sendContact = (body, origin = "https://example.test") =>
+    contact(
+      new Request("https://example.test/api/contact", {
+        method: "POST",
+        headers: { Origin: origin },
+        body: JSON.stringify(body),
+      }),
+    );
+  const inquiry = {
+    name: "Candidate",
+    email: "candidate@example.test",
+    message: "A valid project inquiry for testing.",
+  };
+  assert.equal(
+    (await sendContact(inquiry, "https://other.example")).status,
+    403,
+  );
+  assert.equal((await sendContact(null)).status, 400);
+  const beforeMessages = (await store.list("messages", 200)).length;
+  assert.equal(
+    (await sendContact({ ...inquiry, website: "spam.test" })).status,
+    200,
+  );
+  assert.equal((await store.list("messages", 200)).length, beforeMessages);
+  assert.equal((await sendContact(inquiry)).status, 200);
+  assert.equal((await store.list("messages", 200)).length, beforeMessages + 1);
+  state = await (await GET()).json();
+  const hiddenContact = structuredClone(state.draft);
+  hiddenContact.sections.contact = false;
+  hiddenContact.settings.analytics = "off";
+  assert.equal(
+    (
+      await call({
+        action: "save",
+        content: hiddenContact,
+        revision: state.revision,
+      })
+    ).status,
+    200,
+  );
+  state = await (await GET()).json();
+  assert.equal(
+    (await call({ action: "publish", revision: state.revision })).status,
+    200,
+  );
+  assert.equal((await sendContact(inquiry)).status, 404);
+  const { POST: analytics } = await import(
+    pathToFileURL(path.join(out, "analytics.mjs"))
+  );
+  const previousCommits = commits;
+  const metric = await analytics(
+    new Request("https://example.test/api/analytics", {
+      method: "POST",
+      headers: {
+        Origin: "https://example.test",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ event: "view", source: "test" }),
+    }),
+  );
+  assert.equal(metric.status, 200);
+  assert.equal(
+    commits,
+    previousCommits,
+    "Disabled analytics must not write rate-limit records.",
+  );
+  console.log(
+    "Malformed/oversized requests, strict operations, publish dates, contact origin checks, honeypot and disabled form enforcement passed.",
+  );
+  console.log(
+    "Resume PDF upload, PDF-only enforcement, private draft preview, public isolation and byte-for-byte published download passed.",
+  );
   console.log(
     "Firestore REST encoding, transactions/conflict retry, atomic limits, 512 KiB files, private media, admin draft/publish/restore, origin and stale-revision checks passed (mock transport).",
   );

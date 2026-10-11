@@ -10,9 +10,13 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm audit --omit=dev --audit-level=high
+      - run: npx next typegen
+      - run: npm run lint
       - run: npm run typecheck
       - run: npm run check:auth
       - run: npm run check:storage
       - run: npm run check:public-content
       - run: npm run check:resume
+      - run: npm run check:imports
       - run: npm run build

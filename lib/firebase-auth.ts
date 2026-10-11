@@ -41,7 +41,7 @@ export async function verifyOwnerToken(token: string, recent = false) {
     p.sub.length > 128 ||
     p.email.toLowerCase() !== "anbu.t80555@gmail.com" ||
     p.email_verified !== true ||
-    p.firebase?.sign_in_provider !== "google.com" ||
+    !["google.com", "password"].includes(p.firebase?.sign_in_provider || "") ||
     p.auth_time > now ||
     (recent && now - p.auth_time > 300) ||
     (env.FIREBASE_OWNER_UID && p.sub !== env.FIREBASE_OWNER_UID)

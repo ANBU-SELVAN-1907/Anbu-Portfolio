@@ -1,5 +1,11 @@
 import { sessionCookie, verifyOwnerToken } from "@/lib/firebase-auth";
-import { response, sameOrigin, jsonBody, limited } from "@/lib/server";
+import {
+  requestFailure,
+  response,
+  sameOrigin,
+  jsonBody,
+  limited,
+} from "@/lib/server";
 import { firebaseReady } from "@/lib/firebase";
 export async function POST(r: Request) {
   if (!sameOrigin(r))
@@ -19,7 +25,7 @@ export async function POST(r: Request) {
     if (!owner)
       return response(
         {
-          error: "This Google account is not authorized to edit the portfolio.",
+          error: "This account is not authorized to edit the portfolio.",
         },
         403,
       );
@@ -29,7 +35,9 @@ export async function POST(r: Request) {
       `${sessionCookie}=${b.idToken}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${Math.max(0, Math.min(3600, owner.expires - Math.floor(Date.now() / 1000)))}${process.env.NODE_ENV !== "development" ? "; Secure" : ""}`,
     );
     return result;
-  } catch {
+  } catch (e) {
+    const failure = requestFailure(e);
+    if (failure) return failure;
     return response(
       { error: "Sign-in could not be verified. Please retry." },
       401,

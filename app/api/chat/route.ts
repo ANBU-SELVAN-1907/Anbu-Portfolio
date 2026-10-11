@@ -1,3 +1,4 @@
+import { requestFailure } from "@/lib/server";
 import { env } from "@/lib/env";
 import { z } from "zod";
 import {
@@ -96,7 +97,7 @@ export async function POST(r: Request) {
             )
         : [];
     const context = {
-      name: c.profile.name + " " + c.profile.surname,
+      name: [c.profile.name, c.profile.surname].filter(Boolean).join(" "),
       role: c.profile.role,
       bio: c.sections.about ? c.profile.bio : "",
       location: c.profile.location,
@@ -172,6 +173,8 @@ export async function POST(r: Request) {
       );
     return response({ answer: answer.slice(0, 1800) });
   } catch (e) {
+    const failure = requestFailure(e);
+    if (failure) return failure;
     console.error("AI guide failed", e instanceof Error ? e.name : "error");
     return response(
       {

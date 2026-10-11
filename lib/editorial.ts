@@ -16,7 +16,7 @@ export const editorialSettings = {
   chatbot: "on",
   chatTitle: "Ask about my work",
   chatIntro: "Explore my projects, experience, and skills with an AI guide.",
-  lastUpdated: "2026-10-05",
+  lastUpdated: "2026-10-11",
   defaultTheme: "light",
   privacyNotice: "on",
   paperColor: "#f1eee7",
@@ -115,7 +115,7 @@ export function newEditorialContent(c: Content = initialContent): Content {
       photo: "/anbu-original.png",
       linkedin: "https://www.linkedin.com/in/anbu-selvan-t",
       headline: "Intelligence.\nIn the real world.",
-      eyebrow: "ANBU SELVAN / ENGINEERING INTELLIGENCE",
+      eyebrow: "ANBU SELVAN T / ENGINEERING INTELLIGENCE",
     },
     education: c.education.map((x) =>
       x.id === "hits"

@@ -1,8 +1,8 @@
 # Firebase setup — no billing account
 
-This configuration uses **Firebase Spark**, Google sign-in, and Cloud Firestore. It does not use Cloud Storage, Cloud Functions, App Hosting, SMS authentication, or paid Identity Platform MFA. Do not upgrade to Blaze for this implementation.
+This configuration uses **Firebase Spark**, email-link/Google sign-in, and Cloud Firestore. It does not use Cloud Storage, Cloud Functions, App Hosting, SMS authentication, or paid Identity Platform MFA. Do not upgrade to Blaze for this implementation.
 
-## What is free? Checked 5 October 2026
+## What is free? Checked 6 October 2026
 
 | Service                        | Included allowance                                                                                               |
 | ------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
@@ -22,15 +22,23 @@ Sources: [Firestore pricing](https://firebase.google.com/docs/firestore/pricing)
 4. Project overview → add a **Web app** (`</>`). Register it.
 5. Copy the public web configuration: `apiKey`, `authDomain`, `projectId`, and `appId`. These identify the app; they are not the server's private credential.
 
-## 2. Enable Google sign-in
+## 2. Enable your sign-in methods
 
 1. Build → **Authentication** → Get started → **Sign-in method**.
-2. Enable **Google**, select your project support email, and save.
+2. Enable **Google**, select your project support email, and save. Also enable **Email/Password**, then turn on **Email link (passwordless sign-in)** in that provider and save. You do not need to create a password.
 3. Authentication → **Settings → Authorized domains**: add `localhost` for development and the exact deployed hostname later. Do not include `http://`, port numbers, or URL paths.
-4. Sign in using **anbu.t80555@gmail.com**. Other accounts cannot edit the portfolio.
+4. Sign in using **anbu.t80555@gmail.com**. On `/admin`, select **Email me a sign-in link**, open the email, then confirm the same email to enter. Other accounts cannot edit the portfolio.
 5. After that account exists in Authentication → Users, copy its **UID** into `FIREBASE_OWNER_UID` for an explicit identity pin.
 
-The server independently verifies the Firebase token's signature, project audience, issuer, expiration, Google provider, verified owner email, UID, and account revocation state. A successful frontend login alone never grants admin access. The first verified owner UID is also bound in Firestore.
+The server independently verifies the Firebase token's signature, project audience, issuer, expiration, Google/email provider, verified owner email, UID, and account revocation state. A successful frontend login alone never grants admin access. The first verified owner UID is also bound in Firestore.
+
+### Email-link login and free limits
+
+Firebase sends a one-time clickable link to **anbu.t80555@gmail.com**; it does not send a numeric email OTP. The page asks you to confirm the email after opening the link and creates the private admin session only after server verification. There is no password required in the portfolio.
+
+Firebase Spark allows **5 sign-in emails/day** for the project. The app also limits retries to 3/hour per IP and 5/day globally. Wait before resending and check Spam; Google sign-in remains available after the email quota is exhausted. [Firebase auth limits](https://firebase.google.com/docs/auth/limits), [Email-link setup](https://firebase.google.com/docs/auth/web/email-link-auth)
+
+If Google opens and immediately closes: use a regular browser, enable the Google provider, add the exact site hostname to Authorized domains, and confirm the web config matches the project. The SDK is preloaded before clicking to avoid blocked popups. The page now displays actual setup/error guidance.
 
 ### OTP / two-step verification
 
@@ -50,13 +58,11 @@ The backend uses fixed `portfolio_*` collections. Firestore's automatic single-f
 
 ## 4. Server credential — keep it private
 
-The service-account JSON's `project_id` must match `FIREBASE_PROJECT_ID` exactly. For this installation both must be `anbu-portfolio-b91f6`. A key from a separate project named `anbu-portfolio` cannot be used with this configuration. Put only a valid, unexposed credential from the correct project in your hosting environment.
-
 Use a dedicated Google Cloud service account with **Cloud Datastore User** (`roles/datastore.user`) on this project. It needs Firestore data access, not Owner/Editor or Storage permissions. Generate its JSON key from Google Cloud IAM → Service accounts → that account → Keys. Creating/changing this credential must be done by you in your account.
 
 The private JSON belongs only in the server environment. **Do not paste it into chat, the admin editor, GitHub, or frontend code.** A service-account key bypasses Firestore rules, so treat it like a password. Rotate/delete a leaked key immediately.
 
-For `npm run dev` (Next.js), copy `.env.example` to `.env.local`. For local Workers development, copy `.dev.vars.example` to `.dev.vars`. The public project identifiers for `anbu-portfolio-b91f6` are filled in the example files; fill the blank `FIREBASE_API_KEY` from Firebase Project settings in your ignored local file and production host settings. Put your private server JSON key on one line in the ignored local environment file. `FIREBASE_SERVICE_ACCOUNT_JSON='{"type":...}'` must preserve the JSON's `\n` escapes in `private_key`. The entire file is Git-ignored. An alternative is to store the JSON in an ignored local file and use your host's secret UI to set the server variable.
+Copy `.env.example` to `.env.local`, fill the public configuration, and put the JSON key on one line as shown by the example. `FIREBASE_SERVICE_ACCOUNT_JSON='{"type":...}'` must preserve the JSON's `\n` escapes in `private_key`. The entire `.env.local` file is Git-ignored. An alternative is to store the JSON in an ignored local file and use your host's secret UI to set the server variable.
 
 ## 5. Start and verify
 
@@ -64,7 +70,7 @@ For `npm run dev` (Next.js), copy `.env.example` to `.env.local`. For local Work
 npm run dev
 ```
 
-Open `http://localhost:5173/admin`. Click **Sign in with Google**. The first owner visit initializes the backend when you save. Review the content kit, gallery, and theme before publishing. The admin's draft preview shows changes before they go live.
+Open `http://localhost:5173/admin`. Click **Email me a sign-in link**, open the email, then confirm your owner email. Google sign-in remains an alternative. The first owner visit initializes the backend when you save. Review the content kit, gallery, and theme before publishing. The admin's draft preview shows changes before they go live.
 
 Check these cases on your configured project:
 
@@ -75,13 +81,24 @@ Check these cases on your configured project:
 - Try stale revisions from two studio tabs; the stale update must be rejected.
 - Submit a contact message and review it in the owner's inbox.
 
-Live Firebase owner-login and database verification has not yet run: public project configuration is supplied, but the private server credential still needs to be configured. No mock identity can edit the new admin, even in development.
+The public web configuration is present locally. The private `FIREBASE_SERVICE_ACCOUNT_JSON` credential is still missing, so live owner login, email delivery and backend mutation verification cannot complete yet. No mock identity can edit the new admin, even in development.
 
-## Hosting without paid Firebase services
+## Hosting: GitHub → Vercel
 
-This is a dynamic React/Worker app. Firebase Hosting's free static allowance does **not** include its server runtime; Firebase App Hosting/Functions require billing. Keep this app on a free Worker-capable host and use Firebase Spark for the backend. The existing Sites deployment is active and publicly accessible. Vercel can also host this project using its Next.js build; set the same server environment variables in the Vercel project and add its hostname to Firebase Authentication authorized domains. A standalone Cloudflare Workers Free deployment with a free `workers.dev` subdomain can use the new independent Firebase authentication, but its deployment configuration must be set explicitly—do not deploy the starter's placeholder database ID.
+The source repository is [ANBU-SELVAN-1907/Anbu-Portfolio](https://github.com/ANBU-SELVAN-1907/Anbu-Portfolio). Vercel hosts the native Next.js app; Firebase supplies Google authentication and Firestore. No Cloudflare Worker or Supabase is needed by this runtime.
 
-Use host secrets for the same environment variables in production. Production uses `__Host-anbu_owner`, `Secure`, `HttpOnly`, and `SameSite=Strict` cookies. HTTPS is required. Owner tokens expire within one hour, and Google login is required again. No public service-account secret is allowed.
+Follow [DEPLOYMENT.md](DEPLOYMENT.md) to import the repository into a **Vercel Hobby** personal account. Use its free `.vercel.app` subdomain and HTTPS. Add the exact production hostname to Firebase Authentication → Authorized domains. Keep private secrets in Vercel Settings → Environment Variables and enable them for Production only unless you intentionally configure a separate preview backend.
+
+Production uses `__Host-anbu_owner`, `Secure`, `HttpOnly`, and `SameSite=Strict` cookies. HTTPS is required. Owner tokens expire within one hour, then a fresh email link or Google sign-in is required again.
+
+### Publish your uploaded resume
+
+1. Admin → **Resume download** → **Upload / replace resume**.
+2. Choose a PDF up to **512 KiB**. It is stored privately in Firestore.
+3. Download the draft PDF to check it, then **Save draft → Publish**.
+4. Visitors clicking **Get my resume** receive the exact published PDF. Uploading a replacement does not change the public PDF until you publish.
+
+The automatic PDF remains an optional fallback. Large resumes must be compressed first, or a larger original can be bundled as `/resume.pdf` through the source repository. File bytes in Firestore use about one-third extra space for encoding.
 
 ## Existing data and maintenance
 
@@ -91,6 +108,8 @@ Monitor Firebase → Firestore → Usage. History keeps 20 published snapshots; 
 
 ## Zero-cost choices
 
-Use the free host subdomain instead of buying a custom domain. Do not link a billing account in Firebase, Google AI Studio, or Cloudflare. Cloudflare Workers Free currently permits 100,000 requests/day with a 10 ms CPU allowance per request; check real traffic and CPU use before launch. The browser performs resume generation, keeping that expensive work away from the server. Free-tier quota exhaustion should return an error, never silently switch to a paid plan. See [Workers limits](https://developers.cloudflare.com/workers/platform/limits/).
+Use Vercel Hobby for this personal, non-commercial portfolio and its free subdomain. It currently includes 100 GB fast data transfer, 1 million function invocations, and 4 hours active CPU per month. Its usage limits can pause service rather than supply unlimited capacity. A commercial service needs an eligible hosting plan; do not enable a paid trial or upgrade for this project. See [Vercel Hobby](https://vercel.com/docs/plans/hobby).
 
-The optional chatbot requires a Google AI Studio key in a free-tier project. Its availability and request limits are provider-controlled. Resume editing, analysis, and PDF/DOCX downloads work without it. [Gemini pricing](https://ai.google.dev/gemini-api/docs/pricing)
+Keep Firebase on Spark with no linked billing account. Firestore's free quotas are shared by text, uploads, history, inbox and analytics. Cloud Storage requires Blaze and is excluded. [Firebase Storage billing requirement](https://firebase.google.com/docs/storage/faqs-storage-changes-announced-sept-2024)
+
+Optional chat/AI writing needs a Google AI Studio key in a free-tier project. Availability and request quotas are provider-controlled; do not link paid billing. Resume editing, analysis and PDF/DOCX downloads work without AI. [Gemini pricing](https://ai.google.dev/gemini-api/docs/pricing)

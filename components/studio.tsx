@@ -1,5 +1,7 @@
 "use client";
-import { useEffect, useState, useRef } from "react";
+import Image from "next/image";
+import { useEffect, useEffectEvent, useState, useRef } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
@@ -23,6 +25,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Toaster, toast } from "sonner";
 import {
   Plus,
+  Copy,
+  ChevronDown,
+  Undo2,
+  Redo2,
+  Search,
+  LogOut,
   ArrowUp,
   ArrowDown,
   Trash2,
@@ -96,6 +104,7 @@ type State = {
 const groups = [
   ["overview", "Overview", LayoutDashboard],
   ["profile", "Profile & hero", User],
+  ["resume", "Resume download", Upload],
   ["projects", "Projects", Layers],
   ["skills", "Skills", Cpu],
   ["experience", "Experience", Briefcase],
@@ -243,6 +252,45 @@ const longFields = [
   "credentialNote",
 ];
 export default function Studio({ email }: { email: string }) {
+  const router = useRouter();
+  const [revision, setRevision] = useState(0);
+  const [editHistory, setEditHistory] = useState<{
+    past: Content[];
+    future: Content[];
+  }>({ past: [], future: [] });
+  const [recovered, setRecovered] = useState<Content | null>(null);
+  const [entryQuery, setEntryQuery] = useState("");
+  const [entryLimit, setEntryLimit] = useState(8);
+  const [openEntry, setOpenEntry] = useState("");
+  const recoveryKey = "anbu-admin-draft:" + email;
+  function preserveDraft(next: Content) {
+    try {
+      sessionStorage.setItem(
+        recoveryKey,
+        JSON.stringify({ content: next, revision: revision }),
+      );
+    } catch {}
+  }
+  function acceptLoaded(b: State) {
+    setData(b);
+    setDraft(b.draft);
+    setRevision(b.revision);
+    setDirty(false);
+    setError("");
+    setEditHistory({ past: [], future: [] });
+    try {
+      const raw = sessionStorage.getItem(recoveryKey);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        const candidate = contentSchema.safeParse(parsed.content);
+        if (
+          candidate.success &&
+          JSON.stringify(candidate.data) !== JSON.stringify(b.draft)
+        )
+          setRecovered(candidate.data);
+      }
+    } catch {}
+  }
   const [data, setData] = useState<State | null>(null),
     [draft, setDraft] = useState<Content | null>(null),
     [tab, setTab] = useState("overview"),
@@ -257,26 +305,20 @@ export default function Studio({ email }: { email: string }) {
     [picker, setPicker] = useState<((url: string) => void) | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const backupRef = useRef<HTMLInputElement>(null);
-  const revision = useRef(0);
+  const resumeUploadRef = useRef<HTMLInputElement>(null);
+  const [pickerKind, setPickerKind] = useState("image");
   async function load() {
-    try {
-      const r = await fetch("/api/admin");
-      const b = (await r.json()) as State & {
-        error: string;
-        revision: number;
-        updated: string;
-        url: string;
-      };
-      if (!r.ok) throw Error(b.error);
-      setData(b);
-      setDraft(b.draft);
-      revision.current = b.revision;
-      setDirty(false);
-      setError("");
-    } catch (e) {
-      setError((e as Error).message);
-    }
+    const r = await fetch("/api/admin");
+    const b = (await r.json()) as State & {
+      error: string;
+      revision: number;
+      updated: string;
+      url: string;
+    };
+    if (!r.ok) throw Error(b.error);
+    acceptLoaded(b);
   }
+  const loaded = useEffectEvent((b: State) => acceptLoaded(b));
   useEffect(() => {
     let active = true;
     fetch("/api/admin")
@@ -286,13 +328,7 @@ export default function Studio({ email }: { email: string }) {
         return b;
       })
       .then((b) => {
-        if (active) {
-          setData(b);
-          setDraft(b.draft);
-          revision.current = b.revision;
-          setDirty(false);
-          setError("");
-        }
+        if (active) loaded(b);
       })
       .catch((e) => {
         if (active) setError((e as Error).message);
@@ -300,7 +336,7 @@ export default function Studio({ email }: { email: string }) {
     return () => {
       active = false;
     };
-  }, []);
+  }, [email]);
   useEffect(() => {
     const prevent = (e: BeforeUnloadEvent) => {
       if (dirty) {
@@ -331,10 +367,14 @@ export default function Studio({ email }: { email: string }) {
     const b = await api({
       action: "save",
       content: draft,
-      revision: revision.current,
+      revision: revision,
     });
-    revision.current = b.revision;
+    setRevision(b.revision);
     setDirty(false);
+    setRecovered(null);
+    try {
+      sessionStorage.removeItem(recoveryKey);
+    } catch {}
     setData((d) =>
       d ? { ...d, updated: b.updated, draft, revision: b.revision } : d,
     );
@@ -353,9 +393,73 @@ export default function Studio({ email }: { email: string }) {
     }
   }
   function change(next: Content) {
+    if (draft)
+      setEditHistory((h) => ({
+        past: [...h.past, draft].slice(-30),
+        future: [],
+      }));
     setDraft(next);
-    setDirty(true);
+    setDirty(JSON.stringify(next) !== JSON.stringify(data?.draft));
+    preserveDraft(next);
   }
+  function undoEdit() {
+    const next = editHistory.past.at(-1);
+    if (!next || !draft) return;
+    setEditHistory({
+      past: editHistory.past.slice(0, -1),
+      future: [draft, ...editHistory.future].slice(0, 30),
+    });
+    setDraft(next);
+    setDirty(JSON.stringify(next) !== JSON.stringify(data?.draft));
+    preserveDraft(next);
+  }
+  function redoEdit() {
+    const next = editHistory.future[0];
+    if (!next || !draft) return;
+    setEditHistory({
+      past: [...editHistory.past, draft].slice(-30),
+      future: editHistory.future.slice(1),
+    });
+    setDraft(next);
+    setDirty(JSON.stringify(next) !== JSON.stringify(data?.draft));
+    preserveDraft(next);
+  }
+  async function signOut() {
+    const r = await fetch("/api/auth/session", { method: "DELETE" });
+    if (!r.ok) throw Error("Sign-out failed. Please try again.");
+    router.replace("/admin");
+    router.refresh();
+  }
+  async function downloadDraftResume() {
+    if (dirty) await save();
+    const r = await fetch("/api/resume?preview=1");
+    if (!r.ok)
+      throw Error(
+        "The selected resume could not download. Check the PDF or sign in again.",
+      );
+    const blob = await r.blob(),
+      url = URL.createObjectURL(blob),
+      a = document.createElement("a");
+    a.href = url;
+    a.download = "Anbu-Selvan-T-Resume.pdf";
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+  const shortcut = useEffectEvent((e: KeyboardEvent) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+      e.preventDefault();
+      if (!busy && dirty)
+        act(async () => {
+          await save();
+          toast.success("Draft saved");
+        });
+    }
+  });
+  useEffect(() => {
+    const listener = (e: KeyboardEvent) => shortcut(e);
+    window.addEventListener("keydown", listener);
+    return () => window.removeEventListener("keydown", listener);
+  }, []);
   function exportContent() {
     const blob = new Blob([JSON.stringify(draft, null, 2)], {
       type: "application/json",
@@ -389,19 +493,26 @@ export default function Studio({ email }: { email: string }) {
     });
   }
   async function publish() {
-    if (dirty) await save();
-    const b = await api({ action: "publish", revision: revision.current });
-    revision.current = b.revision;
-    await load();
-    toast.success("Portfolio published. Your changes are live.");
+    const currentRevision = dirty ? (await save()).revision : revision;
+    const b = await api({ action: "publish", revision: currentRevision });
+    setRevision(b.revision);
+    try {
+      await load();
+      toast.success("Portfolio published. Your changes are live.");
+    } catch {
+      throw Error(
+        "Your portfolio was published, but refreshing the editor failed. Reload before editing again.",
+      );
+    }
   }
-  async function upload(file: File) {
+  async function upload(file: File, purpose = "media") {
     if (file.size > 524288)
       throw Error(
         "Keep uploads under 512 KB for free Firebase storage. Compress the image or PDF first.",
       );
     const form = new FormData();
     form.append("file", file);
+    form.append("purpose", purpose);
     const r = await fetch("/api/media", { method: "POST", body: form });
     const b = (await r.json()) as State & {
       error: string;
@@ -410,20 +521,121 @@ export default function Studio({ email }: { email: string }) {
       url: string;
     };
     if (!r.ok) throw Error(b.error);
-    const fresh = (await fetch("/api/admin").then((r) => r.json())) as State;
-    setData((d) => (d ? { ...d, media: fresh.media } : d));
+    const refresh = await fetch("/api/admin");
+    if (refresh.ok) {
+      const fresh = (await refresh.json()) as State;
+      setData((d) => (d ? { ...d, media: fresh.media } : d));
+    }
     toast.success("File uploaded");
     return b.url;
   }
   function field(key: string, value: string, onChange: (v: string) => void) {
-    const file = ["photo", "image", "resume"].includes(key);
+    if (key === "resume") {
+      const current = data?.media.find((m) => value === "/api/media/" + m.id);
+      return (
+        <div className="field wide resume-upload-card" key={key}>
+          <span>Public resume PDF</span>
+          <p>
+            Visitors get this PDF when they click “Get my resume”. Upload a
+            replacement, then save and publish when ready.
+          </p>
+          <input
+            ref={resumeUploadRef}
+            hidden
+            type="file"
+            accept=".pdf,application/pdf"
+            aria-label="Upload resume PDF"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.target.value = "";
+              if (!file) return;
+              act(async () => {
+                if (
+                  file.type !== "application/pdf" ||
+                  !file.name.toLowerCase().endsWith(".pdf")
+                )
+                  throw Error("Choose a PDF resume.");
+                const url = await upload(file, "resume");
+                onChange(url);
+                toast.success(
+                  "Resume selected for your draft. Save and publish to update the download.",
+                );
+              });
+            }}
+          />
+          <div className="actions">
+            <button
+              className="button primary"
+              type="button"
+              onClick={() => resumeUploadRef.current?.click()}
+            >
+              <Upload size={16} />
+              Upload / replace resume
+            </button>
+            <button
+              className="button"
+              type="button"
+              onClick={() => {
+                setPickerKind("resume");
+                setPicker(() => onChange);
+              }}
+            >
+              Choose an existing PDF
+            </button>
+          </div>
+          <strong>
+            {current?.name ||
+              (value === "/api/resume"
+                ? "Automatic PDF from your portfolio"
+                : value === "/resume.pdf"
+                  ? "Bundled original resume"
+                  : value || "No resume selected")}
+          </strong>
+          <small>
+            PDF only · maximum 512 KiB for the strict free Firebase setup. Draft
+            uploads remain private until published.
+          </small>
+          <div className="field-tools">
+            {value && (
+              <button type="button" onClick={() => act(downloadDraftResume)}>
+                Download draft resume
+              </button>
+            )}
+            <button type="button" onClick={() => onChange("/api/resume")}>
+              Use automatic PDF
+            </button>
+            <button type="button" onClick={() => onChange("")}>
+              Hide resume download
+            </button>
+          </div>
+        </div>
+      );
+    }
+    const file = ["photo", "image"].includes(key);
     return (
       <label
         className={longFields.includes(key) ? "field wide" : "field"}
         key={key}
       >
         <span>{labels[key] || key}</span>
-        {longFields.includes(key) ? (
+        {["defaultTheme", "visualTheme"].includes(key) ||
+        (key === "tags" && tab === "customSections") ? (
+          <select
+            value={value || (key === "tags" ? "paper" : "light")}
+            onChange={(e) => onChange(e.target.value)}
+          >
+            {(key === "defaultTheme"
+              ? ["light", "dark"]
+              : key === "visualTheme"
+                ? ["editorial", "noir", "aurora"]
+                : ["paper", "lab", "journey"]
+            ).map((option) => (
+              <option value={option} key={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+        ) : longFields.includes(key) ? (
           <Textarea
             value={value}
             onChange={(e) => onChange(e.target.value)}
@@ -446,22 +658,18 @@ export default function Studio({ email }: { email: string }) {
         )}
         {file && (
           <div className="field-tools">
-            <button type="button" onClick={() => setPicker(() => onChange)}>
+            <button
+              type="button"
+              onClick={() => {
+                setPickerKind("image");
+                setPicker(() => onChange);
+              }}
+            >
               Choose uploaded file
             </button>
-            {key === "resume" && (
-              <button type="button" onClick={() => onChange("/api/resume")}>
-                Use auto-generated PDF
-              </button>
-            )}
           </div>
         )}
-        {key === "resume" && (
-          <small>
-            The automatic PDF always uses your latest published content. A
-            custom PDF must be updated manually.
-          </small>
-        )}
+
         {["headline", "contactTitle"].includes(key) && (
           <small>Use a new line for a deliberate line break.</small>
         )}
@@ -478,15 +686,17 @@ export default function Studio({ email }: { email: string }) {
           </p>
           <button
             className="button primary"
-            onClick={() =>
-              change({
-                ...draft,
-                [name]: [
-                  ...(draft[name] ?? []),
-                  entry({ title: "New " + name.replace(/s$/, "") }),
-                ],
-              })
+            disabled={
+              (draft[name]?.length || 0) >=
+              (name === "customSections" ? 20 : 100)
             }
+            onClick={() => {
+              const next = entry({ title: "New " + name.replace(/s$/, "") });
+              change({ ...draft, [name]: [...(draft[name] || []), next] });
+              setOpenEntry(next.id);
+              setEntryQuery("");
+              setEntryLimit((draft[name]?.length || 0) + 1);
+            }}
           >
             <Plus size={16} />
             Add entry
@@ -497,86 +707,167 @@ export default function Studio({ email }: { email: string }) {
             No entries yet. Add your first one when you&apos;re ready.
           </div>
         )}
-        {(draft[name] ?? []).map((x, i) => (
-          <article className="entry-editor" key={x.id}>
-            <div className="entry-header">
-              <h3>
-                {String(i + 1).padStart(2, "0")} / {x.title || "Untitled"}
-              </h3>
-              <div>
-                <label className="switch-label">
-                  <Switch
-                    checked={x.visible}
-                    onCheckedChange={(v) =>
-                      change({
-                        ...draft,
-                        [name]: (draft[name] ?? []).map((a) =>
-                          a.id === x.id ? { ...a, visible: v } : a,
-                        ),
-                      })
-                    }
-                  />
-                  Visible
-                </label>
+        <div className="collection-toolbar">
+          <label>
+            <Search size={16} />
+            <Input
+              aria-label="Search entries"
+              value={entryQuery}
+              onChange={(e) => {
+                setEntryQuery(e.target.value);
+                setEntryLimit(8);
+              }}
+              placeholder="Find an entry…"
+            />
+          </label>
+          <span>
+            {draft[name]?.length || 0} entries ·{" "}
+            {draft[name]?.filter((x) => x.visible).length || 0} visible
+          </span>
+        </div>
+        {(draft[name] ?? [])
+          .map((x, i) => ({ x, i }))
+          .filter(({ x }) =>
+            [x.title, x.subtitle, x.tags]
+              .join(" ")
+              .toLowerCase()
+              .includes(entryQuery.toLowerCase()),
+          )
+          .slice(0, entryLimit)
+          .map(({ x, i }) => (
+            <article
+              className="entry-editor"
+              data-open={openEntry === x.id}
+              key={x.id}
+            >
+              <div className="entry-header">
                 <button
-                  aria-label="Move entry up"
-                  disabled={i === 0}
-                  onClick={() => {
-                    const items = [...(draft[name] ?? [])];
-                    [items[i - 1], items[i]] = [items[i], items[i - 1]];
-                    change({ ...draft, [name]: items });
-                  }}
+                  className="entry-disclosure"
+                  aria-expanded={openEntry === x.id}
+                  aria-controls={"edit-" + x.id}
+                  onClick={() => setOpenEntry(openEntry === x.id ? "" : x.id)}
                 >
-                  <ArrowUp size={17} />
+                  <span>{String(i + 1).padStart(2, "0")}</span>
+                  <h3>{x.title || "Untitled"}</h3>
+                  <ChevronDown size={18} />
                 </button>
-                <button
-                  aria-label="Move entry down"
-                  disabled={i === (draft[name] ?? []).length - 1}
-                  onClick={() => {
-                    const items = [...(draft[name] ?? [])];
-                    [items[i + 1], items[i]] = [items[i], items[i + 1]];
-                    change({ ...draft, [name]: items });
-                  }}
-                >
-                  <ArrowDown size={17} />
-                </button>
-                <button
-                  aria-label="Delete entry"
-                  onClick={() =>
-                    setConfirm({
-                      title: "Remove this entry?",
-                      description:
-                        "This removes the entry from your draft. The live portfolio stays unchanged until you publish.",
-                      run: () =>
+                <div>
+                  <label className="switch-label">
+                    <Switch
+                      checked={x.visible}
+                      onCheckedChange={(v) =>
                         change({
                           ...draft,
-                          [name]: (draft[name] ?? []).filter(
-                            (a) => a.id !== x.id,
+                          [name]: (draft[name] ?? []).map((a) =>
+                            a.id === x.id ? { ...a, visible: v } : a,
+                          ),
+                        })
+                      }
+                    />
+                    Visible
+                  </label>
+                  <button
+                    aria-label="Move entry up"
+                    disabled={i === 0}
+                    onClick={() => {
+                      const items = [...(draft[name] ?? [])];
+                      [items[i - 1], items[i]] = [items[i], items[i - 1]];
+                      change({ ...draft, [name]: items });
+                    }}
+                  >
+                    <ArrowUp size={17} />
+                  </button>
+                  <button
+                    aria-label="Move entry down"
+                    disabled={i === (draft[name] ?? []).length - 1}
+                    onClick={() => {
+                      const items = [...(draft[name] ?? [])];
+                      [items[i + 1], items[i]] = [items[i], items[i + 1]];
+                      change({ ...draft, [name]: items });
+                    }}
+                  >
+                    <ArrowDown size={17} />
+                  </button>
+                  <button
+                    aria-label={"Duplicate " + (x.title || "entry")}
+                    disabled={
+                      (draft[name]?.length || 0) >=
+                      (name === "customSections" ? 20 : 100)
+                    }
+                    onClick={() => {
+                      const next = {
+                        ...x,
+                        id: crypto.randomUUID(),
+                        title: x.title + " copy",
+                      };
+                      const items = [...(draft[name] || [])];
+                      items.splice(i + 1, 0, next);
+                      change({ ...draft, [name]: items });
+                      setOpenEntry(next.id);
+                      setEntryLimit(items.length);
+                    }}
+                  >
+                    <Copy size={16} />
+                  </button>
+                  <button
+                    aria-label="Delete entry"
+                    onClick={() =>
+                      setConfirm({
+                        title: "Remove this entry?",
+                        description:
+                          "This removes the entry from your draft. The live portfolio stays unchanged until you publish.",
+                        run: () =>
+                          change({
+                            ...draft,
+                            [name]: (draft[name] ?? []).filter(
+                              (a) => a.id !== x.id,
+                            ),
+                          }),
+                      })
+                    }
+                  >
+                    <Trash2 size={17} />
+                  </button>
+                </div>
+              </div>
+              {openEntry === x.id && (
+                <div className="fields entry-fields" id={"edit-" + x.id}>
+                  {Object.entries(x)
+                    .filter(([k]) => collectionFields[name].includes(k))
+                    .map(([k, v]) =>
+                      field(k, String(v), (value) =>
+                        change({
+                          ...draft,
+                          [name]: (draft[name] ?? []).map((a) =>
+                            a.id === x.id ? { ...a, [k]: value } : a,
                           ),
                         }),
-                    })
-                  }
-                >
-                  <Trash2 size={17} />
-                </button>
-              </div>
-            </div>
-            <div className="fields">
-              {Object.entries(x)
-                .filter(([k]) => collectionFields[name].includes(k))
-                .map(([k, v]) =>
-                  field(k, String(v), (value) =>
-                    change({
-                      ...draft,
-                      [name]: (draft[name] ?? []).map((a) =>
-                        a.id === x.id ? { ...a, [k]: value } : a,
                       ),
-                    }),
-                  ),
-                )}
-            </div>
-          </article>
-        ))}
+                    )}
+                </div>
+              )}
+            </article>
+          ))}
+        {(draft[name] || []).filter((x) =>
+          [x.title, x.subtitle, x.tags]
+            .join(" ")
+            .toLowerCase()
+            .includes(entryQuery.toLowerCase()),
+        ).length > entryLimit && (
+          <button
+            className="button"
+            onClick={() => setEntryLimit((v) => v + 8)}
+          >
+            Show 8 more entries
+          </button>
+        )}
+        {entryQuery &&
+          !(draft[name] || []).some((x) =>
+            [x.title, x.subtitle, x.tags]
+              .join(" ")
+              .toLowerCase()
+              .includes(entryQuery.toLowerCase()),
+          ) && <p className="empty-state">No matching entries.</p>}
       </>
     );
   useEffect(() => {
@@ -635,7 +926,7 @@ export default function Studio({ email }: { email: string }) {
       <main className="error-page">
         <p>{error || "Opening your studio…"}</p>
         {error && (
-          <button className="button" onClick={load}>
+          <button className="button" onClick={() => act(load)}>
             Try again
           </button>
         )}
@@ -646,7 +937,16 @@ export default function Studio({ email }: { email: string }) {
   return (
     <div className="studio">
       <Toaster theme="light" richColors />
-      <Tabs value={tab} onValueChange={setTab} className="studio-layout">
+      <Tabs
+        value={tab}
+        onValueChange={(value) => {
+          setTab(value);
+          setEntryQuery("");
+          setEntryLimit(8);
+          setOpenEntry("");
+        }}
+        className="studio-layout"
+      >
         <aside className="studio-sidebar">
           <Link className="brand" href="/">
             anbu<span> / T</span>
@@ -665,7 +965,27 @@ export default function Studio({ email }: { email: string }) {
           </TabsList>
           <div className="studio-account">
             <span>{email}</span>
-            <a href="/signout-with-chatgpt?return_to=/admin">Sign out ↗</a>
+            <button
+              className="studio-signout"
+              disabled={busy}
+              onClick={() =>
+                dirty
+                  ? setConfirm({
+                      title: "Save your draft and sign out?",
+                      description:
+                        "Your current edits will be saved before ending the admin session.",
+                      run: () =>
+                        act(async () => {
+                          await save();
+                          await signOut();
+                        }),
+                    })
+                  : act(signOut)
+              }
+            >
+              <LogOut size={14} />
+              Sign out
+            </button>
           </div>
         </aside>
         <div className="studio-main">
@@ -683,8 +1003,24 @@ export default function Studio({ email }: { email: string }) {
                     : "Ready to edit"}
               </span>
               <button
+                className="studio-icon"
+                aria-label="Undo last edit"
+                disabled={busy || !editHistory.past.length}
+                onClick={undoEdit}
+              >
+                <Undo2 size={17} />
+              </button>
+              <button
+                className="studio-icon"
+                aria-label="Redo edit"
+                disabled={busy || !editHistory.future.length}
+                onClick={redoEdit}
+              >
+                <Redo2 size={17} />
+              </button>
+              <button
                 className="button"
-                disabled={busy}
+                disabled={busy || !dirty}
                 onClick={() =>
                   act(async () => {
                     await save();
@@ -716,6 +1052,41 @@ export default function Studio({ email }: { email: string }) {
               {error}
             </div>
           )}
+          {recovered && (
+            <div className="draft-recovery" role="status">
+              <div>
+                <strong>An unsaved draft was recovered on this tab.</strong>
+                <p>
+                  Review it before saving. The published portfolio stays
+                  available.
+                </p>
+              </div>
+              <button
+                className="button"
+                onClick={() => {
+                  change(recovered);
+                  setRecovered(null);
+                  toast.success("Recovered draft loaded for review");
+                }}
+              >
+                Review recovered draft
+              </button>
+              <button
+                className="text-button"
+                onClick={() => {
+                  setRecovered(null);
+                  sessionStorage.removeItem(recoveryKey);
+                }}
+              >
+                Keep server draft
+              </button>
+            </div>
+          )}
+          {busy && (
+            <div className="studio-working" role="status">
+              Working on your update…
+            </div>
+          )}
           <div className="studio-body" inert={busy}>
             <TabsContent value="overview">
               <div className="welcome-panel">
@@ -736,7 +1107,7 @@ export default function Studio({ email }: { email: string }) {
                     onClick={() =>
                       act(async () => {
                         if (dirty) await save();
-                        window.location.assign("/admin/preview");
+                        router.push("/admin/preview");
                       })
                     }
                   >
@@ -864,15 +1235,35 @@ export default function Studio({ email }: { email: string }) {
                   Your name, story, contact details, and first impression.
                 </p>
                 <div className="fields">
-                  {Object.entries(draft.profile).map(([k, v]) =>
-                    field(k, v, (value) =>
-                      change({
-                        ...draft,
-                        profile: { ...draft.profile, [k]: value },
-                      }),
-                    ),
-                  )}
+                  {Object.entries(draft.profile)
+                    .filter(([k]) => k !== "resume")
+                    .map(([k, v]) =>
+                      field(k, v, (value) =>
+                        change({
+                          ...draft,
+                          profile: { ...draft.profile, [k]: value },
+                        }),
+                      ),
+                    )}
                 </div>
+              </div>
+            </TabsContent>
+            <TabsContent value="resume">
+              <div className="studio-card">
+                <h3>Your downloadable resume</h3>
+                {field("resume", draft.profile.resume, (value) =>
+                  change({
+                    ...draft,
+                    profile: { ...draft.profile, resume: value },
+                  }),
+                )}
+                <p className="muted">
+                  The current published PDF stays available while you work on a
+                  replacement. Upload → Save draft → Publish.
+                </p>
+                <a className="text-button" href="/api/resume">
+                  Download the current public resume ↗
+                </a>
               </div>
             </TabsContent>
             {(
@@ -1053,7 +1444,13 @@ export default function Studio({ email }: { email: string }) {
                   <article key={m.id}>
                     <div className="media-thumb">
                       {m.type.startsWith("image/") ? (
-                        <img src={"/api/media/" + m.id} alt={m.name} />
+                        <Image
+                          unoptimized
+                          src={"/api/media/" + m.id}
+                          alt={m.name}
+                          width={600}
+                          height={450}
+                        />
                       ) : (
                         <span>PDF</span>
                       )}
@@ -1076,7 +1473,7 @@ export default function Studio({ email }: { email: string }) {
                           setConfirm({
                             title: "Delete this file?",
                             description:
-                              "Files used in your current draft or published portfolio cannot be deleted. Old version references may stop working.",
+                              "Files used in your draft, published portfolio, or retained version history cannot be deleted.",
                             run: () =>
                               act(async () => {
                                 const r = await fetch("/api/media?id=" + m.id, {
@@ -1213,7 +1610,7 @@ export default function Studio({ email }: { email: string }) {
                             await api({
                               action: "restore",
                               id: h.id,
-                              revision: revision.current,
+                              revision: revision,
                             });
                             await load();
                             toast.success("Version restored to draft");
@@ -1260,41 +1657,64 @@ export default function Studio({ email }: { email: string }) {
         }}
       >
         <DialogContent className="media-picker">
-          <DialogTitle>Choose a file</DialogTitle>
+          <DialogTitle>
+            {pickerKind === "resume"
+              ? "Choose a resume PDF"
+              : "Choose an image"}
+          </DialogTitle>
           <DialogDescription>
             Select an uploaded file, or upload one now.
           </DialogDescription>
           <input
             type="file"
-            accept="image/png,image/jpeg,image/webp,application/pdf"
+            accept={
+              pickerKind === "resume"
+                ? ".pdf,application/pdf"
+                : "image/png,image/jpeg,image/webp"
+            }
             disabled={busy}
             onChange={(e) => {
               const f = e.target.files?.[0];
               if (f)
                 act(async () => {
-                  const url = await upload(f);
+                  const url = await upload(
+                    f,
+                    pickerKind === "resume" ? "resume" : "media",
+                  );
                   picker?.(url);
                   setPicker(null);
                 });
             }}
           />
           <div className="media-grid">
-            {data.media.map((m) => (
-              <button
-                key={m.id}
-                onClick={() => {
-                  picker?.("/api/media/" + m.id);
-                  setPicker(null);
-                }}
-              >
-                {m.type.startsWith("image/") ? (
-                  <img src={"/api/media/" + m.id} alt={m.name} />
-                ) : (
-                  <span>PDF</span>
-                )}
-                <span>{m.name}</span>
-              </button>
-            ))}
+            {data.media
+              .filter((m) =>
+                pickerKind === "resume"
+                  ? m.type === "application/pdf"
+                  : m.type.startsWith("image/"),
+              )
+              .map((m) => (
+                <button
+                  key={m.id}
+                  onClick={() => {
+                    picker?.("/api/media/" + m.id);
+                    setPicker(null);
+                  }}
+                >
+                  {m.type.startsWith("image/") ? (
+                    <Image
+                      unoptimized
+                      src={"/api/media/" + m.id}
+                      alt={m.name}
+                      width={600}
+                      height={450}
+                    />
+                  ) : (
+                    <span>PDF</span>
+                  )}
+                  <span>{m.name}</span>
+                </button>
+              ))}
           </div>
         </DialogContent>
       </Dialog>

@@ -1,43 +1,86 @@
-# Deployment and configuration
+# Deploy: GitHub + Vercel + Firebase
 
-## Current status
+## Stack
 
-The app is configured in code for Firebase Spark Authentication and Firestore, including bounded small-file uploads. No Supabase integration is used. Firebase Cloud Storage and paid Firebase server services are excluded. See [FIREBASE_SETUP.md](FIREBASE_SETUP.md) for the exact console steps and current free quotas.
+- Source: [ANBU-SELVAN-1907/Anbu-Portfolio](https://github.com/ANBU-SELVAN-1907/Anbu-Portfolio)
+- Hosting: Vercel **Hobby**, native Next.js 16 + React 19
+- Backend: Firebase **Spark**, email-link/Google sign-in + Firestore
+- Files: private Firestore uploads up to **512 KiB**, larger static assets in `public/`
+- Optional AI: Google AI Studio free-tier key, server-only
 
-The Sites deployment is active and public at https://anbu-selvan-portfolio.polite-hero-4309.chatgpt.site. Portfolio visitors and Resume Studio users do not need to log in. Admin routes and data APIs require verified owner authentication. The existing Site project identifier remains in `.openai/hosting.json`. Vercel deployment is supported by `vercel.json` and the Next.js build.
+No paid upgrade, Cloud Storage, Supabase, Firebase Functions/App Hosting, Vercel Blob or paid domain is required. Vercel Hobby is for personal, non-commercial use, with quotas; it is not an unlimited free enterprise service. [Plan terms and limits](https://vercel.com/docs/plans/hobby)
 
-Firebase public project identifiers for `anbu-portfolio-b91f6` are present in the example environment files; the API key is configured only in ignored local files and host environment settings and configured on the existing Sites deployment. A server-only service-account secret and owner UID have not yet been provided. Until then the public page shows the bundled content kit; admin access, contact delivery, and persistent cloud mutations are unavailable. No development account or trusted browser header can bypass the new Firebase admin verification.
+## 1. Import the repository
 
-## Run locally
+1. Open [Vercel new project](https://vercel.com/new) in your personal **Hobby** account.
+2. Import `ANBU-SELVAN-1907/Anbu-Portfolio`. Authorize only the repository needed by the project.
+3. Framework preset: **Next.js**. Root directory: repository root.
+4. Build command: `npm run build`. Install command: `npm ci`. Leave the output directory at its Next.js default. Node.js: **22.x**.
+5. Use the generated `.vercel.app` domain. Do not choose a Pro trial or buy a domain for strict zero-cost hosting.
+
+Native Next.js replaces the previous local Vinext/Cloudflare runtime. `vercel.json` declares Next.js; no adapter or Worker database binding is needed. The old local files/data remain available only for migration. The new runtime reads `process.env`.
+
+## 2. Configure Firebase
+
+Complete [FIREBASE_SETUP.md](FIREBASE_SETUP.md): Spark project, Google and Email link providers, Firestore production rules/index exemptions and a dedicated service account with Cloud Datastore User access.
+
+Vercel Project → Settings → Environment Variables. Add these to **Production**:
+
+| Variable                        | Value                                                                                |
+| ------------------------------- | ------------------------------------------------------------------------------------ |
+| `FIREBASE_API_KEY`              | Public Firebase web config `apiKey`                                                  |
+| `FIREBASE_AUTH_DOMAIN`          | Public config `authDomain`                                                           |
+| `FIREBASE_PROJECT_ID`           | Public config `projectId`                                                            |
+| `FIREBASE_APP_ID`               | Public config `appId`                                                                |
+| `FIREBASE_OWNER_UID`            | Owner's Firebase user UID, recommended after first sign-in                           |
+| `FIREBASE_SERVICE_ACCOUNT_JSON` | Private, compact JSON key; paste the raw JSON value without surrounding shell quotes |
+| `GEMINI_API_KEY`                | Optional free-tier Google AI Studio key                                              |
+| `GEMINI_MODEL`                  | Optional; default `gemini-3.5-flash-lite`                                            |
+
+Never prefix the service-account or Gemini variables with `NEXT_PUBLIC_`. Never commit `.env.local`, private JSON keys or tokens. Public Firebase config is returned by `/api/auth/config`; the private credential stays server-only.
+
+Enable private variables as sensitive in Vercel if available. Keep Production credentials out of Preview deployments; public previews otherwise share the real inbox/data. Use a separate free Firebase project if you need cloud-backed preview testing.
+
+## 3. Deploy and authorize the domain
+
+1. Deploy after setting the variables (or redeploy if they were added later).
+2. Copy the actual deployed hostname, such as your project's generated `.vercel.app` host. Do not assume a hostname before Vercel returns it.
+3. Firebase Authentication → Settings → Authorized domains → add that hostname, without protocol/path/port.
+4. Visit `/admin` and request a sign-in link for `anbu.t80555@gmail.com`, open it, and confirm the same email. Review the draft, theme and gallery, then publish.
+5. Admin → Resume download → upload a PDF → check the draft download → Save draft → Publish.
+6. Verify visitor downloads, contact delivery, unauthorized account rejection, stale revisions, drafts/history and private uploads on the deployed origin.
+
+Vercel's Git integration redeploys production when the production branch changes. CMS text/media updates publish immediately through Firebase and do not require a Git commit. Production tokens expire within one hour; sign in again when needed.
+
+## Local development
 
 ```powershell
+Copy-Item .env.example .env.local
+npm ci
 npm run dev
-npm run typecheck
-npm run build
-node scripts/check-resume.mjs
-node scripts/check-firebase.mjs
 ```
 
-Open `http://localhost:5173/`, `/admin`, and `/resume-builder`. The builder works locally without an account or Firebase credentials. Its drafts stay in the browser; the portfolio's editable content uses Firestore.
+Fill `.env.local` privately before starting. Local URLs: `/`, `/admin`, `/resume-builder` at `http://localhost:5173`. Add `localhost` to Firebase's authorized domains. Builds and public resume editing work without cloud credentials; Firebase admin, inbox, uploads and server AI remain unavailable until configured.
 
-## Production
+## Verification
 
-Public pages read only published content. If Firebase configuration, authorization, database access, or published JSON fails, the portfolio and Resume Studio use the bundled public content. Server logs contain a safe reason code such as `firebase_project_mismatch` or `firestore_http_403`; raw credentials and malformed JSON are never logged. Admin draft reads and writes remain strict, so an outage cannot silently replace stored edits with bundled defaults.
+```powershell
+npm run typecheck
+npm run check:auth
+npm run check:storage
+npm run check:public-content
+npm run check:resume
+npm run check:imports
+npm run lint
+npm run build
+```
 
-For Sites, use the existing source/version/deployment workflow. For Vercel, import this repository using Next.js, build with `npm run build`, and configure the server environment variables from `.env.example` through Vercel project settings before redeploying. The app's React server runtime remains a Worker; Firebase is the external backend. Set `FIREBASE_*` variables as host environment variables/secrets. `FIREBASE_SERVICE_ACCOUNT_JSON` is private and must never appear in Git, client bundles, or the admin editor. Public Firebase configuration may be exposed by `/api/auth/config`.
+The security/storage tests mock Google's transport while testing real JWT cryptography and application flows. They are not a replacement for live Firebase checks. The GitHub workflow runs checks without cloud secrets. Local HTTP checks are in `scripts/check-public.py`; set `PORTFOLIO_TEST_URL` to the temporary production server URL (default port 5174). See SECURITY.md for audit results and the remaining lint-only upstream advisory.
 
-Standalone deployment can use Cloudflare Workers Free with a free `workers.dev` subdomain because owner auth is now independently verified through Firebase. Firebase Hosting's static free tier does not run this dynamic server. Do not select Firebase App Hosting/Functions or enable billing when strict zero-cost operation is required. The starter's Cloudflare database ID is a placeholder, not a production resource. Legacy D1/R2 source schemas and local data are retained for migration. Their hosting bindings are now disabled; runtime storage uses Firestore.
+## Privacy and cost
 
-Check owner login, token revocation, unauthorized requests, stale revisions, drafts, publish/history, small-file upload/private access, contact delivery, and generated resume on the actual deployed origin. Do not describe local/mock transport checks as production verification.
+Stay on **Hobby + Spark** without payment accounts. Vercel's included usage can pause services when exhausted; Spark quotas can make Firestore unavailable. File uploads share Firestore's 1 GiB allowance with other records. No automatic paid upgrade is implemented.
 
-## AI setup
+The optional AI provider may use free-tier chat/resume text to improve products. Resume AI asks for consent and suggestions require review. Local editing, scoring, imports and exports do not send resume content to Firebase. [Gemini free-tier terms](https://ai.google.dev/gemini-api/docs/pricing)
 
-For local Next.js development, copy `.env.example` to `.env.local` and set `GEMINI_API_KEY` there. For local Workers development, use `.dev.vars.example` and `.dev.vars`. Restart the local server. Use a free-tier Google AI Studio project without paid billing; availability/quota is provider-controlled. Production needs the same server secret. The default model is `gemini-3.5-flash-lite`; `GEMINI_MODEL` can change it.
-
-Chat and resume AI use server-only keys, origin checks, bounded input, rate limits, timeouts, and safe errors. Resume suggestions require consent and review. Visitor chat and resume text may be used by Google to improve products under its free-tier terms. Editing, scoring, import, and downloads do not require AI. No live inference has been tested because the key is not configured.
-
-## Original portrait and sources
-
-`public/anbu-original.png` remains byte-for-byte identical to the supplied 1086 × 1448 portrait (SHA-256 `FD23A472DFA55F88F33A3FA24CDF329CA6D01683EA07C2EE4CD62691212F2299`). The frame/background animate; the face has not been regenerated or retouched. It is not a native 4K image.
-
-The full name is Anbu Selvan T. The GitHub link is `https://github.com/ANBU-SELVAN-1907`. Credential facts came from the matching public LinkedIn profile, with the outbound link using the latest user-supplied URL. No fabricated awards, testimonials, metrics, or demos were added.
+The original portrait remains byte-for-byte unchanged (1086 × 1448). The frame/background animate; the face is not regenerated. Keep backups through Admin → Overview → Export draft JSON; media files need separate offline copies.

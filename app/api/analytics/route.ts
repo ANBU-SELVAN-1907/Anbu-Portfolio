@@ -1,3 +1,4 @@
+import { requestFailure } from "@/lib/server";
 import { z } from "zod";
 import {
   store,
@@ -20,7 +21,6 @@ const schema = z
 export async function POST(r: Request) {
   try {
     if (!sameOrigin(r)) return response({}, 403);
-    if (await limited(r, "view", 60, 3600)) return response({}, 429);
     const b = schema.safeParse(
       r.headers.get("content-type")?.includes("application/json")
         ? await jsonBody(r, 1000)
@@ -29,6 +29,7 @@ export async function POST(r: Request) {
     if (!b.success) return response({}, 400);
     if ((await published()).settings.analytics !== "on")
       return response({ ok: true });
+    if (await limited(r, "view", 60, 3600)) return response({}, 429);
     await track(b.data.event === "view" ? "views" : "attempts");
     if (b.data.event === "view") {
       const day = new Date().toISOString().slice(0, 10),
@@ -40,7 +41,9 @@ export async function POST(r: Request) {
       }));
     }
     return response({ ok: true });
-  } catch {
+  } catch (e) {
+    const failure = requestFailure(e);
+    if (failure) return failure;
     return response({}, 503);
   }
 }

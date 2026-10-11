@@ -1,4 +1,5 @@
 import {
+  requestFailure,
   admin,
   bucket,
   store,
@@ -13,10 +14,16 @@ export async function POST(r: Request) {
       return response({ error: "Admin authorization required." }, 403);
     if (Number(r.headers.get("content-length")) > 600_000)
       return response({ error: "Maximum upload size is 512 KB." }, 413);
+    if (!r.headers.get("content-type")?.startsWith("multipart/form-data;"))
+      return response({ error: "Use the upload form to choose a file." }, 400);
     const form = await new Response(await boundedBytes(r, 600000), {
       headers: { "Content-Type": r.headers.get("Content-Type") || "" },
-    }).formData();
+    })
+      .formData()
+      .catch(() => null);
+    if (!form) return response({ error: "The upload form is invalid." }, 400);
     const f = form.get("file");
+    const resume = form.get("purpose") === "resume";
     if (!(f instanceof File) || f.size > 524288 || f.size === 0)
       return response({ error: "Select a file under 512 KB." }, 400);
     const bytes = new Uint8Array(await f.arrayBuffer());
@@ -29,9 +36,13 @@ export async function POST(r: Request) {
         String.fromCharCode(...head.slice(8, 12)) === "WEBP",
       "application/pdf": String.fromCharCode(...head.slice(0, 5)) === "%PDF-",
     };
-    if (!types[f.type])
+    if (!types[f.type] || (resume && f.type !== "application/pdf"))
       return response(
-        { error: "Use a valid PNG, JPEG, WebP image or PDF." },
+        {
+          error: resume
+            ? "Your resume must be a PDF file."
+            : "Use a valid PNG, JPEG, WebP image or PDF.",
+        },
         400,
       );
     const id = crypto.randomUUID();
@@ -50,6 +61,8 @@ export async function POST(r: Request) {
     }
     return response({ id, url: "/api/media/" + id, name: f.name });
   } catch (e) {
+    const failure = requestFailure(e);
+    if (failure) return failure;
     console.error(e);
     return response({ error: "Upload failed. Please try again." }, 503);
   }
@@ -59,7 +72,8 @@ export async function DELETE(r: Request) {
     if (!sameOrigin(r) || !(await admin()))
       return response({ error: "Admin authorization required." }, 403);
     const id = new URL(r.url).searchParams.get("id");
-    if (!id) return response({ error: "Missing file." }, 400);
+    if (!id || !/^[a-f0-9-]{36}$/.test(id))
+      return response({ error: "Choose a valid file." }, 400);
     const s = await snapshot();
     const retainedHistory = await store.list("history", 20);
     if (JSON.stringify([s, retainedHistory]).includes("/api/media/" + id))

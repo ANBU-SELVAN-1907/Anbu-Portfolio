@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 import { useRef } from "react";
 import { ArrowUpRight } from "lucide-react";
 export default function PortraitStage({
@@ -47,7 +48,8 @@ export default function PortraitStage({
           <ArrowUpRight size={16} />
         </div>
         {src ? (
-          <img
+          <Image
+            unoptimized
             src={src}
             alt={`${name}, in a suit outdoors`}
             width={1086}

@@ -1,5 +1,7 @@
 import {
+  requestFailure,
   store,
+  published,
   response,
   sameOrigin,
   jsonBody,
@@ -7,13 +9,15 @@ import {
   track,
 } from "@/lib/server";
 import { z } from "zod";
-const schema = z.object({
-  name: z.string().trim().min(2).max(100),
-  email: z.string().email().max(254),
-  message: z.string().trim().min(10).max(5000),
-  website: z.string().max(200).optional(),
-  analytics: z.boolean().optional(),
-});
+const schema = z
+  .object({
+    name: z.string().trim().min(2).max(100),
+    email: z.string().email().max(254),
+    message: z.string().trim().min(10).max(5000),
+    website: z.string().max(200).optional(),
+    analytics: z.boolean().optional(),
+  })
+  .strict();
 export async function POST(r: Request) {
   try {
     if (!sameOrigin(r))
@@ -21,7 +25,15 @@ export async function POST(r: Request) {
         { error: "Please send your message from this website." },
         403,
       );
-    if (await limited(r, "contact", 5, 3600))
+    if (!(await published()).sections.contact)
+      return response(
+        { error: "The contact form is unavailable. Please use email." },
+        404,
+      );
+    if (
+      (await limited(r, "contact", 5, 3600)) ||
+      (await limited(new Request(r.url), "contact-global", 100, 86400))
+    )
       return response(
         { error: "Too many messages. Please try again later or use email." },
         429,
@@ -48,6 +60,8 @@ export async function POST(r: Request) {
     if (b.data.analytics) await track("contacts").catch(console.error);
     return response({ ok: true });
   } catch (e) {
+    const failure = requestFailure(e);
+    if (failure) return failure;
     console.error(e);
     return response(
       {

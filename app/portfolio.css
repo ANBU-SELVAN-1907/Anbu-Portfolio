@@ -1827,6 +1827,7 @@ html:has(.portfolio[data-motion="off"]) {
 .v2-reveal {
   transition:
     opacity 0.7s,
+    transform 0.8s cubic-bezier(0.16, 1, 0.3, 1),
     translate 0.8s cubic-bezier(0.16, 1, 0.3, 1);
 }
 @media (prefers-reduced-motion: no-preference) {
@@ -2935,5 +2936,87 @@ html:has(.portfolio[data-motion="off"]) {
   .builder-glyph {
     transition: none !important;
     transform: none !important;
+  }
+}
+
+.portfolio[data-visual="noir"] {
+  --subtle: #b2bcb1;
+  --line: #d9e2dc28;
+}
+.portfolio[data-theme="dark"] {
+  --paper: #171d1b;
+  --ink: #edf2e9;
+  --olive: #2b392e;
+  --subtle: #b4c5b3;
+  --line: #dce8dc2b;
+}
+.portfolio[data-theme="dark"] .hero-summary,
+.portfolio[data-theme="dark"] .hero-title {
+  color: var(--subtle);
+}
+.portfolio .folio-header {
+  background: color-mix(in srgb, var(--paper) 91%, transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+.portfolio .folio-section {
+  scroll-margin-top: 92px;
+}
+.portfolio .folio-section h2 {
+  text-wrap: balance;
+}
+.portfolio .hero-summary,
+.portfolio .about-copy p {
+  text-wrap: pretty;
+}
+.portfolio .credential {
+  border: 0;
+  border-bottom: 1px solid var(--line);
+}
+.portfolio .credentials-grid {
+  border: 0;
+  gap: 1px;
+  background: var(--line);
+}
+.portfolio .credential {
+  background: var(--paper);
+  transition:
+    background 0.3s,
+    translate 0.3s;
+}
+.portfolio .credential:hover {
+  background: var(--olive);
+  translate: 0 -3px;
+}
+.portfolio .credential:nth-last-child(-n + 2) {
+  border-bottom: 1px solid var(--line);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .portfolio[data-motion="on"] .work-story .v2-reveal:not(.in-view) {
+    transform: translate3d(0, 35px, 0) scale(0.985);
+  }
+  .portfolio[data-motion="on"] .about-story .v2-reveal:not(.in-view) {
+    transform: translate3d(-24px, 0, 0);
+  }
+  .portfolio[data-motion="on"] .journey-story .v2-reveal:not(.in-view) {
+    transform: translate3d(0, 30px, 0);
+  }
+  .portfolio .v2-reveal.in-view {
+    transform: none;
+  }
+}
+.portfolio .achievement-card:focus-visible {
+  outline: 3px solid var(--orange);
+  outline-offset: 5px;
+}
+@media (max-width: 580px) {
+  .portfolio .folio-section {
+    scroll-margin-top: 70px;
+  }
+  .portfolio .folio-actions {
+    row-gap: 18px;
+  }
+  .portfolio .folio-header {
+    gap: 10px;
   }
 }

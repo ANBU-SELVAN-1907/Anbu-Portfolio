@@ -1,12 +1,13 @@
 # Anbu Selvan T — Portfolio & Resume Studio
 
+A native Next.js 16 + React 19 portfolio for Vercel, with Firebase Spark email-link/Google authentication and Firestore.
+
 A responsive editorial portfolio with an owner content studio, achievements gallery, three visual themes, custom chapters, interactive project walkthroughs, and a public resume builder.
 
 ## Start
 
 ```powershell
 npm install
-Copy-Item .env.example .env.local
 npm run dev
 ```
 
@@ -20,6 +21,7 @@ The builder works without sign-up or cloud credentials. Configure Firebase Spark
 
 - [Firebase setup, free allowances, and Google sign-in](FIREBASE_SETUP.md)
 - [Architecture](ARCHITECTURE.md)
+- [Security checks and remaining setup](SECURITY.md)
 - [Deployment and optional AI](DEPLOYMENT.md)
 - [Resume builder features and limitations](RESUME_BUILDER.md)
 
@@ -27,18 +29,18 @@ The builder works without sign-up or cloud credentials. Configure Firebase Spark
 
 ```powershell
 npm run typecheck
+npm run lint
 npm run build
 node scripts/check-resume.mjs
 node scripts/check-firebase.mjs
 node scripts/check-firestore.mjs
+npm run check:imports
 ```
 
-The portfolio and Resume Studio are publicly accessible without login. Only portfolio administration requires verified owner authentication. The active Firebase project is `anbu-portfolio-b91f6`; its public project identifiers are provided in the example environment files. Fill `FIREBASE_API_KEY` from Firebase Project settings in your ignored local environment file and host environment settings. The private server credential and owner UID still need to be configured.
+Deploy the repository to Vercel Hobby using the Next.js preset. Firebase and Gemini configuration must be supplied privately through local/server environment files, never committed or pasted into chat.
 
-## Deploy to Vercel
+The admin includes a dedicated **Resume download** tab: upload a PDF, save the draft, then publish. Visitors receive that exact PDF from **Get my resume**. Maximum free-plan upload: 512 KiB.
 
-Import this GitHub repository as a Next.js project. Use the repository root and `npm run build`; leave the output directory at its default. In project environment settings, add `FIREBASE_API_KEY`, `FIREBASE_AUTH_DOMAIN`, `FIREBASE_PROJECT_ID`, and `FIREBASE_APP_ID` using `.env.example` and your Firebase web app configuration. The API key placeholder is intentionally blank. Add the private `FIREBASE_SERVICE_ACCOUNT_JSON` directly in Vercel as a sensitive server variable. After the first authorized Google login, set `FIREBASE_OWNER_UID` and redeploy.
+The studio supports 30-step undo/redo, tab-local draft recovery, searchable and collapsible entries, duplication, ordering, visibility controls, and JSON backups. Publishing and restoring use revision checks to protect concurrent edits.
 
-Enable Google sign-in and create the default Firestore database in the Firebase console. Publish the rules in `firebase/firestore.rules`, apply the index exemptions in `firebase/firestore.indexes.json`, and add your exact deployed hostname to Firebase Authentication's authorized domains. See `FIREBASE_SETUP.md` for details.
-
-This repository contains the application source, bundled assets, export fonts, database rules, configuration, and validation scripts. Dependencies, generated builds, local drafts, environment secrets, and credential files are excluded. Optional AI features require a privately configured `GEMINI_API_KEY`.
+Security checks cover verified owner tokens and account revocation, private draft files, same-origin mutations, malformed/oversized requests, upload signatures, and fresh Content Security Policy nonces. Live sign-in and cloud writes still require the private Firebase server credential described in the setup guide.

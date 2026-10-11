@@ -11,11 +11,15 @@ const config: NextConfig = {
             key: "Permissions-Policy",
             value: "camera=(), microphone=(), geolocation=()",
           },
-          {
-            key: "Content-Security-Policy",
-            value:
-              "object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'self' blob: https://*.firebaseapp.com https://*.web.app https://accounts.google.com",
-          },
+          { key: "X-Frame-Options", value: "DENY" },
+          ...(process.env.NODE_ENV === "production"
+            ? [
+                {
+                  key: "Strict-Transport-Security",
+                  value: "max-age=31536000; includeSubDomains",
+                },
+              ]
+            : []),
         ],
       },
     ];

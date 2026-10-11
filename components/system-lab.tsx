@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 import { useState } from "react";
 import {
   ArrowUpRight,
@@ -143,8 +144,11 @@ export default function SystemLab({
           <Braces size={16} />
         </div>
         {p.image ? (
-          <img
+          <Image
+            unoptimized
             className="lab-image"
+            width={1000}
+            height={650}
             src={p.image}
             alt={p.title}
             loading="lazy"

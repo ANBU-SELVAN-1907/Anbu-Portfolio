@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 import { useState, useEffect, useRef, type CSSProperties } from "react";
 import {
   ArrowUpRight,
@@ -361,11 +362,11 @@ export default function Portfolio({
                 <a
                   className="underlink"
                   href={
-                    p.resume === "/api/resume" &&
-                    consent === "allowed" &&
-                    !preview
-                      ? "/api/resume?analytics=1"
-                      : p.resume
+                    preview
+                      ? "/api/resume?preview=1"
+                      : consent === "allowed"
+                        ? "/api/resume?analytics=1"
+                        : "/api/resume"
                   }
                   download
                 >
@@ -478,7 +479,7 @@ export default function Portfolio({
               </a>
               <div className="about-signature">
                 {p.name}
-                <span> / {p.surname || p.name.split(" ").at(-1)}</span>
+                <span> / {p.location}</span>
               </div>
             </div>
           </div>
@@ -688,7 +689,8 @@ export default function Portfolio({
                   )}
                 </div>
                 {x.image && (
-                  <img
+                  <Image
+                    unoptimized
                     src={x.image}
                     alt={x.title}
                     loading="lazy"
@@ -944,7 +946,15 @@ export default function Portfolio({
         <DialogContent className="folio-case">
           <DialogTitle>{selected?.title}</DialogTitle>
           <DialogDescription>{selected?.description}</DialogDescription>
-          {selected?.image && <img src={selected.image} alt={selected.title} />}
+          {selected?.image && (
+            <Image
+              unoptimized
+              src={selected.image}
+              alt={selected.title}
+              width={1000}
+              height={650}
+            />
+          )}
           {[
             ["The context", selected?.problem],
             ["My role & process", selected?.process],

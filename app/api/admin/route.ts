@@ -1,4 +1,6 @@
+import { z } from "zod";
 import {
+  requestFailure,
   admin,
   store,
   snapshot,
@@ -8,6 +10,17 @@ import {
   jsonBody,
 } from "@/lib/server";
 import { contentSchema } from "@/lib/validation";
+const revision = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
+const id = z.string().uuid();
+const operation = z.discriminatedUnion("action", [
+  z
+    .object({ action: z.literal("save"), revision, content: contentSchema })
+    .strict(),
+  z.object({ action: z.literal("publish"), revision }).strict(),
+  z.object({ action: z.literal("restore"), revision, id }).strict(),
+  z.object({ action: z.literal("read"), id }).strict(),
+  z.object({ action: z.literal("delete-message"), id }).strict(),
+]);
 export const dynamic = "force-dynamic";
 export async function GET() {
   try {
@@ -57,9 +70,23 @@ export async function POST(r: Request) {
   try {
     if (!sameOrigin(r) || !(await admin()))
       return response({ error: "Admin authorization required." }, 403);
-    const b = await jsonBody(r);
-    await ensureContent();
-    if (["save", "publish", "restore"].includes(b.action)) {
+    const parsed = operation.safeParse(await jsonBody(r));
+    if (!parsed.success)
+      return response(
+        {
+          error: parsed.error.issues
+            .map((i) => i.path.join(".") + ": " + i.message)
+            .join("; "),
+        },
+        400,
+      );
+    const b = parsed.data;
+    if (
+      b.action === "save" ||
+      b.action === "publish" ||
+      b.action === "restore"
+    ) {
+      await ensureContent();
       if (!Number.isInteger(b.revision) || b.revision < 0)
         return response({ error: "Invalid content revision." }, 400);
       let payload = "";
@@ -79,7 +106,18 @@ export async function POST(r: Request) {
       if (b.action === "restore") {
         const saved = await store.get("history", String(b.id));
         if (!saved) return response({ error: "Version not found." }, 404);
-        payload = String(saved.payload);
+        const restored = contentSchema.safeParse(
+          JSON.parse(String(saved.payload)),
+        );
+        if (!restored.success)
+          return response(
+            {
+              error:
+                "That saved version has an incompatible format. Export it before migrating.",
+            },
+            400,
+          );
+        payload = JSON.stringify(restored.data);
       }
       const created = new Date().toISOString(),
         id = crypto.randomUUID();
@@ -91,7 +129,16 @@ export async function POST(r: Request) {
           revision,
           updated: created,
           ...(b.action === "publish"
-            ? { published: old.draft }
+            ? {
+                published: JSON.stringify({
+                  ...contentSchema.parse(JSON.parse(String(old.draft))),
+                  settings: {
+                    ...contentSchema.parse(JSON.parse(String(old.draft)))
+                      .settings,
+                    lastUpdated: created.slice(0, 10),
+                  },
+                }),
+              }
             : { draft: payload }),
         };
         return {
@@ -122,10 +169,10 @@ export async function POST(r: Request) {
           409,
         );
       if (b.action === "publish") {
-        const history = await store.list("history", 40);
+        const history = await store.list("history", 40).catch(() => []);
         await Promise.all(
           history.slice(20).map((x) => store.remove("history", String(x.id))),
-        );
+        ).catch(() => {});
       }
       return response(row);
     }
@@ -138,7 +185,9 @@ export async function POST(r: Request) {
       return response({ ok: true });
     }
     return response({ error: "Unknown operation." }, 400);
-  } catch {
+  } catch (e) {
+    const failure = requestFailure(e);
+    if (failure) return failure;
     return response(
       {
         error:

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import "./resume-builder.css";
+export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Anbu Selvan T — AI & Embedded Systems Engineer",
   description:

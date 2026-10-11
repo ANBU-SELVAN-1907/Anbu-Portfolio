@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 import { useState } from "react";
 import { Award, ArrowUpRight, ImageIcon } from "lucide-react";
 import type { Entry } from "@/lib/content";
@@ -58,7 +59,8 @@ export default function AchievementGallery({ entries }: { entries: Entry[] }) {
           >
             <div className="achievement-visual">
               {x.image ? (
-                <img
+                <Image
+                  unoptimized
                   src={x.image}
                   alt={x.title}
                   loading="lazy"
@@ -103,7 +105,8 @@ export default function AchievementGallery({ entries }: { entries: Entry[] }) {
             {selected?.subtitle} · {selected?.period}
           </DialogDescription>
           {selected?.image && (
-            <img
+            <Image
+              unoptimized
               src={selected.image}
               alt={selected.title}
               width={1000}

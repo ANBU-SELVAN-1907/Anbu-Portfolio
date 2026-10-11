@@ -86,11 +86,24 @@ export function response(data: unknown, status = 200) {
 export function sameOrigin(r: Request) {
   return r.headers.get("origin") === new URL(r.url).origin;
 }
+export class RequestError extends Error {
+  constructor(
+    message: string,
+    public status: number,
+  ) {
+    super(message);
+  }
+}
+export function requestFailure(error: unknown) {
+  return error instanceof RequestError
+    ? response({ error: error.message }, error.status)
+    : null;
+}
 export async function boundedBytes(r: Request, max: number) {
   if (Number(r.headers.get("content-length")) > max)
-    throw Error("Request too large.");
+    throw new RequestError("Request exceeds the allowed size.", 413);
   const reader = r.body?.getReader();
-  if (!reader) throw Error("Missing body.");
+  if (!reader) throw new RequestError("A request body is required.", 400);
   const chunks: Uint8Array[] = [];
   let bytes = 0;
   for (;;) {
@@ -99,7 +112,7 @@ export async function boundedBytes(r: Request, max: number) {
     bytes += chunk.value.length;
     if (bytes > max) {
       await reader.cancel();
-      throw Error("Request too large.");
+      throw new RequestError("Request exceeds the allowed size.", 413);
     }
     chunks.push(chunk.value);
   }
@@ -112,7 +125,15 @@ export async function boundedBytes(r: Request, max: number) {
   return body;
 }
 export async function jsonBody(r: Request, max = 250000) {
-  return JSON.parse(new TextDecoder().decode(await boundedBytes(r, max)));
+  const bytes = await boundedBytes(r, max);
+  try {
+    const parsed = JSON.parse(new TextDecoder().decode(bytes));
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed))
+      throw Error("object required");
+    return parsed;
+  } catch {
+    throw new RequestError("Provide a valid JSON object.", 400);
+  }
 }
 export async function limited(
   r: Request,

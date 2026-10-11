@@ -4,11 +4,8 @@ export async function readResumeFile(file: File): Promise<string> {
   const ext = file.name.toLowerCase().split(".").at(-1);
   if (ext === "txt") return (await file.text()).slice(0, 30000);
   if (ext === "docx") {
-    const mammoth = await import("mammoth/mammoth.browser");
-    const result = await mammoth.extractRawText({
-      arrayBuffer: await file.arrayBuffer(),
-    });
-    return result.value.slice(0, 30000);
+    const { docxText } = await import("./docx-import");
+    return docxText(new Uint8Array(await file.arrayBuffer()));
   }
   if (ext === "pdf") {
     const pdfjs = await import("pdfjs-dist");

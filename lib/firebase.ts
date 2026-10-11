@@ -21,6 +21,10 @@ export function firebaseConfig() {
     appId: env.FIREBASE_APP_ID || "",
   };
 }
+export function firebaseAuthReady() {
+  const c = firebaseConfig();
+  return Boolean(c.apiKey && c.authDomain && c.projectId && c.appId);
+}
 export function firebaseReady() {
   const c = firebaseConfig();
   return Boolean(

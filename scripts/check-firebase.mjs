@@ -82,6 +82,22 @@ async function token(change = {}) {
     .sign(privateKey);
 }
 assert.ok(await verifyOwnerToken(await token(), true));
+assert.ok(
+  await verifyOwnerToken(
+    await token({ firebase: { sign_in_provider: "password" } }),
+    true,
+  ),
+);
+assert.equal(
+  await verifyOwnerToken(
+    await token({
+      firebase: { sign_in_provider: "password" },
+      email_verified: false,
+    }),
+    true,
+  ),
+  null,
+);
 assert.equal(
   await verifyOwnerToken(await token({ email: "other@example.test" })),
   null,
@@ -92,7 +108,7 @@ assert.equal(
 );
 assert.equal(
   await verifyOwnerToken(
-    await token({ firebase: { sign_in_provider: "password" } }),
+    await token({ firebase: { sign_in_provider: "anonymous" } }),
   ),
   null,
 );

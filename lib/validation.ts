@@ -62,7 +62,15 @@ export const contentSchema = z
         linkedin: url,
         github: url,
         photo: url,
-        resume: url,
+        resume: url.refine(
+          (v) =>
+            !v ||
+            v === "/api/resume" ||
+            v === "/resume.pdf" ||
+            /^\/api\/media\/[a-f0-9-]{36}$/.test(v) ||
+            v.startsWith("https://"),
+          "Choose an uploaded PDF, the bundled resume, or the automatic PDF.",
+        ),
         availability: text,
         contactTitle: text,
         contactText: text,
