@@ -343,6 +343,13 @@ try {
   content.sections.experience = false;
   assert.equal(isPublishedMedia(content, "proof"), false);
 
+  content.settings.introEnabled = "on";
+  content.settings.introFrames =
+    "/api/media/intro-frame\n/hero-frames/11-finishing-pose.png";
+  assert.equal(isPublishedMedia(content, "intro-frame"), true);
+  content.settings.introEnabled = "off";
+  assert.equal(isPublishedMedia(content, "intro-frame"), false);
+
   const { POST: sendEmail } = await import(
     pathToFileURL(path.join(out, "email.mjs"))
   );
@@ -550,24 +557,47 @@ try {
   console.log(
     "Firestore REST encoding, transactions/conflict retry, atomic limits, 4 MiB original files with chunk integrity, private media, admin draft/publish/restore, origin and stale-revision checks passed (mock transport).",
   );
-  const { env: runtimeEnv } = await import(pathToFileURL(path.join(out, "env.mjs")));
+  const { env: runtimeEnv } = await import(
+    pathToFileURL(path.join(out, "env.mjs"))
+  );
   const savedCredential = runtimeEnv.FIREBASE_SERVICE_ACCOUNT_JSON;
   async function freshHealth(suffix) {
-    const runtime = await import(pathToFileURL(path.join(out, "firebase.mjs")) + "?health=" + suffix);
+    const runtime = await import(
+      pathToFileURL(path.join(out, "firebase.mjs")) + "?health=" + suffix
+    );
     return runtime.firebaseHealth();
   }
   runtimeEnv.FIREBASE_SERVICE_ACCOUNT_JSON = "malformed";
-  let health = await freshHealth("invalid"); assert.equal(health.ok, false); assert.match(health.message, /complete JSON/);
-  runtimeEnv.FIREBASE_SERVICE_ACCOUNT_JSON = JSON.stringify({...JSON.parse(savedCredential), project_id: "wrong-project"});
-  health = await freshHealth("mismatch"); assert.equal(health.ok, false); assert.match(health.message, /different project/);
+  let health = await freshHealth("invalid");
+  assert.equal(health.ok, false);
+  assert.match(health.message, /complete JSON/);
+  runtimeEnv.FIREBASE_SERVICE_ACCOUNT_JSON = JSON.stringify({
+    ...JSON.parse(savedCredential),
+    project_id: "wrong-project",
+  });
+  health = await freshHealth("mismatch");
+  assert.equal(health.ok, false);
+  assert.match(health.message, /different project/);
   runtimeEnv.FIREBASE_SERVICE_ACCOUNT_JSON = savedCredential;
-  health = await freshHealth("valid"); assert.equal(health.ok, true);
+  health = await freshHealth("valid");
+  assert.equal(health.ok, true);
   const transport = globalThis.fetch;
-  for (const [status, message, expected] of [[403, "permission denied", /Cloud Datastore User/], [404, "The database (default) does not exist", /Create the/], [429, "quota", /quota/]]) {
-    globalThis.fetch = async (url, init) => new URL(url).hostname === "firestore.googleapis.com" ? Response.json({error:{message}}, {status}) : transport(url, init);
-    health = await freshHealth(String(status)); assert.equal(health.ok, false); assert.match(health.message, expected);
+  for (const [status, message, expected] of [
+    [403, "permission denied", /Cloud Datastore User/],
+    [404, "The database (default) does not exist", /Create the/],
+    [429, "quota", /quota/],
+  ]) {
+    globalThis.fetch = async (url, init) =>
+      new URL(url).hostname === "firestore.googleapis.com"
+        ? Response.json({ error: { message } }, { status })
+        : transport(url, init);
+    health = await freshHealth(String(status));
+    assert.equal(health.ok, false);
+    assert.match(health.message, expected);
   }
-  console.log("Firebase readiness diagnoses malformed keys, project mismatch, IAM denial, missing database and quotas without exposing credentials.");
+  console.log(
+    "Firebase readiness diagnoses malformed keys, project mismatch, IAM denial, missing database and quotas without exposing credentials.",
+  );
 } finally {
   globalThis.fetch = realFetch;
 }

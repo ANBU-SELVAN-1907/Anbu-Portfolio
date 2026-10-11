@@ -3,6 +3,13 @@ export function isPublishedMedia(content: Content, id: string) {
   const path = "/api/media/" + id;
   if ([content.profile.photo, content.profile.resume].includes(path))
     return true;
+  if (
+    content.settings.introEnabled === "on" &&
+    content.settings.introFrames
+      ?.split("\n")
+      .some((frame) => frame.trim() === path)
+  )
+    return true;
   for (const collection of [
     "projects",
     "experience",
