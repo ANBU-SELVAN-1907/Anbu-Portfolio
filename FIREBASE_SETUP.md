@@ -12,7 +12,7 @@ This configuration uses **Firebase Spark**, email-link/Google sign-in, and Cloud
 
 Sources: [Firestore pricing](https://firebase.google.com/docs/firestore/pricing), [Firebase pricing](https://firebase.google.com/pricing). Provider policies can change. On Spark, exceeding a quota can make a service unavailable; the app does not automatically upgrade the plan.
 
-**File tradeoff:** Cloud Storage now requires Blaze, so this app stores small uploads inside private Firestore documents. Each upload is limited to **4 MiB**, with base64 encoding using about one-third more database space. Files share the 1 GiB database allowance with content, history, metrics, and messages. Files up to 4 MiB are preserved byte-for-byte and split into 512 KiB chunks, committed atomically with a SHA-256 integrity digest. Larger files can be bundled as website assets. The original portrait remains a bundled file and is unchanged. Firestore is adequate for a small portfolio's lightweight uploads, not a general large-file storage service.
+**Current file storage:** all new upload binaries and backup exports use **Cloudflare R2**, not Firebase Cloud Storage or Firestore file chunks. See [R2_SETUP.md](R2_SETUP.md). Firebase remains on Spark for authentication and structured database records. Legacy Firestore file copies remain readable and migrate through the admin. R2 has its own subscription/free allowance and can bill for excess usage; its setup is separate from Firebase Spark.
 
 ## 1. Create the Firebase project
 
@@ -77,7 +77,7 @@ Check these cases on your configured project:
 - Correct Google account opens the studio; a different account is denied.
 - Draft changes do not alter the public portfolio until Publish.
 - Revoke refresh tokens or disable the account; subsequent admin requests fail.
-- Upload a file under 4 MiB, publish it in the gallery, then verify it on the public page. An unused/unpublished upload must return 404 to visitors.
+- After configuring R2, upload an original file up to 100 MiB, publish it in the gallery, then verify it on the public page. An unused/unpublished upload must return 404 to visitors.
 - Try stale revisions from two studio tabs; the stale update must be rejected.
 - Submit a contact message and review it in the owner's inbox.
 
@@ -94,15 +94,15 @@ Production uses `__Host-anbu_owner`, `Secure`, `HttpOnly`, and `SameSite=Strict`
 ### Publish your uploaded resume
 
 1. Admin → **Resume download** → **Upload / replace resume**.
-2. Choose a PDF up to **4 MiB**. It is stored privately in Firestore.
+2. Choose a PDF up to **100 MiB**. It uploads directly to private R2 and is verified before publication.
 3. Download the draft PDF to check it, then **Save draft → Publish**.
 4. Visitors clicking **Get my resume** receive the exact published PDF. Uploading a replacement does not change the public PDF until you publish.
 
-The automatic PDF remains an optional fallback. A larger original can be bundled as `/resume.pdf` through the source repository. File bytes in Firestore use about one-third extra space for encoding.
+The automatic PDF remains an optional fallback. A larger original can be bundled as `/resume.pdf` through the source repository. R2 stores original file bytes without base64 overhead.
 
 ## Existing data and maintenance
 
-Legacy D1/R2 files and migrations are retained, but current runtime storage calls use Firestore. Nothing was deleted from the old backend. A local legacy draft and published snapshot were preserved in ignored `.sites-runtime/legacy-draft.json` and `.sites-runtime/legacy-published.json`. After configuring Firebase, use Overview → Import content backup to review either snapshot as a draft before saving/publishing. Overview → Export draft JSON creates future offline content backups. Media URLs must refer to files migrated to the new store. The bundled resume/photo remain available.
+Legacy D1 files and migrations are retained. Current structured database calls use Firestore; current file uploads use Cloudflare R2. Nothing was deleted from the old backend. A local legacy draft and published snapshot were preserved in ignored `.sites-runtime/legacy-draft.json` and `.sites-runtime/legacy-published.json`. After configuring Firebase, use Overview → Import content backup to review either snapshot as a draft before saving/publishing. Overview → Export draft JSON creates future offline content backups. Media URLs must refer to files migrated to the new store. The bundled resume/photo remain available.
 
 Monitor Firebase → Firestore → Usage. History keeps 20 published snapshots; uploads have a size limit. Rate-limit records use keyed IP hashes and are reused between windows. Review old messages/media/metrics periodically. No paid TTL, automatic backup, or point-in-time recovery is enabled. Export published content from the studio regularly and keep an offline backup.
 
@@ -110,7 +110,7 @@ Monitor Firebase → Firestore → Usage. History keeps 20 published snapshots; 
 
 Use Vercel Hobby for this personal, non-commercial portfolio and its free subdomain. It currently includes 100 GB fast data transfer, 1 million function invocations, and 4 hours active CPU per month. Its usage limits can pause service rather than supply unlimited capacity. A commercial service needs an eligible hosting plan; do not enable a paid trial or upgrade for this project. See [Vercel Hobby](https://vercel.com/docs/plans/hobby).
 
-Keep Firebase on Spark with no linked billing account. Firestore's free quotas are shared by text, uploads, history, inbox and analytics. Cloud Storage requires Blaze and is excluded. [Firebase Storage billing requirement](https://firebase.google.com/docs/storage/faqs-storage-changes-announced-sept-2024)
+Keep Firebase on Spark with no linked billing account. Firestore's free quotas are shared by text, file metadata, history, inbox and analytics. Upload binaries and backups now use R2; see R2_SETUP.md for its separate free-tier/billing terms. Cloud Storage requires Blaze and is excluded. [Firebase Storage billing requirement](https://firebase.google.com/docs/storage/faqs-storage-changes-announced-sept-2024)
 
 Optional chat/AI writing needs a Google AI Studio key in a free-tier project. Availability and request quotas are provider-controlled; do not link paid billing. Resume editing, analysis and PDF/DOCX downloads work without AI. [Gemini pricing](https://ai.google.dev/gemini-api/docs/pricing)
 

@@ -28,12 +28,20 @@ export default function EvidenceViewer({
     if (!url) return;
     const controller = new AbortController();
     if (!url.startsWith("/api/media/") && !/\.pdf(?:\?|$)/i.test(url)) return;
-    fetch(url, { signal: controller.signal })
+    fetch(url.startsWith("/api/media/") ? `${url}?info=1` : url, {
+      signal: controller.signal,
+    })
       .then(async (r) => {
         if (!r.ok) throw Error("This proof could not load. Please try again.");
-        const type = r.headers.get("content-type") || "";
+        const type = url.startsWith("/api/media/")
+          ? String((await r.json()).type)
+          : r.headers.get("content-type") || "";
         if (type.includes("pdf")) {
-          const bytes = new Uint8Array(await r.arrayBuffer());
+          const pdf = url.startsWith("/api/media/")
+            ? await fetch(url, { signal: controller.signal })
+            : r;
+          if (!pdf.ok) throw Error("The original document could not load.");
+          const bytes = new Uint8Array(await pdf.arrayBuffer());
           if (!controller.signal.aborted) setDocument({ url, type, bytes });
         } else if (!controller.signal.aborted) setDocument({ url, type });
       })
@@ -72,6 +80,25 @@ export default function EvidenceViewer({
                 bytes={document.bytes}
                 label="Supporting document"
               />
+            ) : document?.url === url && document.type.startsWith("video/") ? (
+              <video
+                controls
+                playsInline
+                preload="metadata"
+                src={url}
+                aria-label={entry?.title}
+              />
+            ) : document?.url === url && document.type.startsWith("audio/") ? (
+              <audio
+                controls
+                preload="metadata"
+                src={url}
+                aria-label={entry?.title}
+              />
+            ) : document?.url === url &&
+              document.type &&
+              !document.type.startsWith("image/") ? (
+              <p>Use Open original to download this document or data file.</p>
             ) : url ? (
               <Image
                 unoptimized

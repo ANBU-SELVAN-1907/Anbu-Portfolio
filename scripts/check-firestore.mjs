@@ -53,7 +53,16 @@ await fs.writeFile(
   path.join(out, "auth.mjs"),
   'export let allowed=true;export function setAllowed(v){allowed=v;}export async function firebaseOwner(){return allowed ? {email:"owner@example.test"}:null;}',
 );
+await fs.writeFile(
+  path.join(out, "storage.mjs"),
+  'export {firebaseBucket as fileBucket} from "./firebase.mjs";export async function storageDownload(){return null;}',
+);
+await fs.writeFile(
+  path.join(out, "r2.mjs"),
+  "export async function r2Remove(){}",
+);
 await compile("lib/firebase-server.ts", "server.mjs", {
+  '"./storage"': '"./storage.mjs"',
   '"./env"': '"./env.mjs"',
   '"./media"': '"./media-limits.mjs"',
   '"./editorial"': '"./editorial.mjs"',
@@ -71,10 +80,12 @@ await compile("app/api/auth/email/route.ts", "email.mjs", {
 });
 await compile("lib/pdf.ts", "pdf.mjs");
 await compile("app/api/resume/route.ts", "resume.mjs", {
+  '"@/lib/storage"': '"./storage.mjs"',
   '"@/lib/server"': '"./server.mjs"',
   '"@/lib/pdf"': '"./pdf.mjs"',
 });
 await compile("app/api/media/route.ts", "media.mjs", {
+  '"@/lib/r2"': '"./r2.mjs"',
   '"@/lib/media"': '"./media-limits.mjs"',
   '"@/lib/server"': '"./server.mjs"',
 });

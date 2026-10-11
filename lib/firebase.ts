@@ -1,6 +1,6 @@
 import { env } from "./env";
 import { importPKCS8, SignJWT } from "jose";
-import { MAX_MEDIA_BYTES, MEDIA_CHUNK_BYTES } from "./media";
+import { LEGACY_MAX_MEDIA_BYTES as MAX_MEDIA_BYTES, MEDIA_CHUNK_BYTES } from "./media";
 type Value = {
   stringValue?: string;
   integerValue?: string;

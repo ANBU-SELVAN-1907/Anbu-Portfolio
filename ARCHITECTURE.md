@@ -2,7 +2,7 @@
 
 ## Runtime and boundaries
 
-The Next.js 16/React 19 app runs server pages/API routes on Vercel using its Node.js runtime. Firebase Spark supplies Authentication and Firestore through HTTPS. No Supabase, paid Cloud Storage, Functions, App Hosting, or billing service is required by the new runtime. Legacy D1/R2 schemas and local data remain in the workspace for migration. They are excluded from the GitHub/Vercel application source.
+The Next.js 16/React 19 app runs server pages/API routes on Vercel using its Node.js runtime. Firebase Spark supplies Authentication and Firestore through HTTPS. Cloudflare R2 stores uploaded originals and backup exports. No Supabase, Firebase Cloud Storage, Functions or App Hosting is used. R2 requires its own subscription activation and can bill above its free allowance. Legacy D1 schemas and local data remain in the workspace for migration; they are excluded from the GitHub/Vercel application source.
 
 `lib/firebase.ts` is the server storage boundary. It obtains scoped OAuth tokens from a private service-account key and calls Firestore REST. `lib/firebase-server.ts` exposes content snapshots, initialization, bounded request bodies, publication-aware reads, rate limits, and aggregate metrics. Content and large file/history fields are exempt from indexing through `firebase/firestore.indexes.json`.
 
@@ -18,7 +18,7 @@ The browser receives a short-lived HttpOnly session cookie, Secure with the __Ho
 
 Content is a strict versioned schema. Draft saves and publishes use Firestore transactions with revision checks. Publishing atomically writes live content and its history snapshot. Only public, enabled, visible content exposes file links. The owner can restore snapshots into a draft; publishing is a separate action. Up to 20 published versions are retained.
 
-Spark-compatible uploads use private Firestore documents, capped at 4 MiB. Binary files are base64 encoded, share database storage, and never use Cloud Storage. Uploads have bounded request streams and signature/type checks. API access determines whether a file is published. Deletion refuses current and retained-history references. This is a deliberate small-portfolio tradeoff; large media belong in bundled assets or a future object-store adapter.
+Uploads use private Cloudflare R2 through the official S3 SDK. The browser sends originals directly to a five-minute presigned staging URL, avoiding Vercel payload limits. The backend verifies size/signature/SHA-256, promotes bytes to a separate immutable key, and commits media metadata in Firestore. Public/owner checks precede signed downloads. Firestore still supplies transactions and auth ownership. Legacy byte files remain readable and are copied/verified via migration; source bytes are preserved. Owner-only R2 application backups include content and file references. See R2_SETUP.md for limits and recovery semantics.
 
 ## Public presentation
 

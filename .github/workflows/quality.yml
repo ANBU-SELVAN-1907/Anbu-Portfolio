@@ -17,6 +17,7 @@ jobs:
       - run: npm run check:hero
       - run: npm run check:auth
       - run: npm run check:storage
+      - run: npm run check:r2
       - run: npm run check:public-content
       - run: npm run check:resume
       - run: npm run check:imports

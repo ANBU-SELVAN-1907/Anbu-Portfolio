@@ -1,10 +1,11 @@
 import { env } from "./env";
 import type { Content } from "./content";
 import { normalizeContent, newEditorialContent } from "./editorial";
-import { firebaseBucket, firebaseReady, store } from "./firebase";
+import { firebaseReady, store } from "./firebase";
+import { fileBucket } from "./storage";
 import { firebaseOwner } from "./firebase-auth";
 export { store } from "./firebase";
-export const bucket = () => firebaseBucket;
+export const bucket = () => fileBucket;
 export const admin = firebaseOwner;
 export async function snapshot() {
   const row = firebaseReady() ? await store.get("content", "main") : null;

@@ -39,7 +39,12 @@ export function firebaseReady(){return configured;}
 export const firebaseBucket={};
 export const store={async get(){reads++;if(failure)throw failure;return row;}};`,
 );
+await fs.writeFile(
+  path.join(out, "storage.mjs"),
+  "export const fileBucket={};",
+);
 await compile("firebase-server", {
+  '"./storage"': '"./storage.mjs"',
   '"./env"': '"./env.mjs"',
   '"./editorial"': '"./editorial.mjs"',
   '"./firebase"': '"./firebase.mjs"',

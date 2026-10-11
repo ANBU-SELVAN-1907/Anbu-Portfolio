@@ -5,7 +5,7 @@
 - Source: [ANBU-SELVAN-1907/Anbu-Portfolio](https://github.com/ANBU-SELVAN-1907/Anbu-Portfolio)
 - Hosting: Vercel **Hobby**, native Next.js 16 + React 19
 - Backend: Firebase **Spark**, email-link/Google sign-in + Firestore
-- Files: private Firestore uploads up to **4 MiB**, larger static assets in `public/`
+- Files: private Cloudflare R2 originals up to **100 MiB** via direct uploads; bundled assets in `public/`
 - Optional AI: Google AI Studio free-tier key, server-only
 
 No paid upgrade, Cloud Storage, Supabase, Firebase Functions/App Hosting, Vercel Blob or paid domain is required. Vercel Hobby is for personal, non-commercial use, with quotas; it is not an unlimited free enterprise service. [Plan terms and limits](https://vercel.com/docs/plans/hobby)
@@ -79,8 +79,12 @@ The security/storage tests mock Google's transport while testing real JWT crypto
 
 ## Privacy and cost
 
-Stay on **Hobby + Spark** without payment accounts. Vercel's included usage can pause services when exhausted; Spark quotas can make Firestore unavailable. File uploads share Firestore's 1 GiB allowance with other records. No automatic paid upgrade is implemented.
+Use **Vercel Hobby + Firebase Spark + R2 Standard** within their included allowances. Vercel's included usage can pause services when exhausted; Spark quotas can make Firestore unavailable. Upload binaries and backup exports use R2, which requires subscription activation and bills above its free allowance. The app's limits are not a Cloudflare spending cap. No Firebase paid upgrade is implemented. See R2_SETUP.md.
 
 The optional AI provider may use free-tier chat/resume text to improve products. Resume AI asks for consent and suggestions require review. Local editing, scoring, imports and exports do not send resume content to Firebase. [Gemini free-tier terms](https://ai.google.dev/gemini-api/docs/pricing)
 
 The original portrait remains byte-for-byte unchanged (1086 × 1448). The frame/background animate; the face is not regenerated. Keep backups through Admin → Overview → Export draft JSON; media files need separate offline copies.
+
+## R2 variables
+
+Add R2_ACCOUNT_ID, R2_BUCKET_NAME, R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY in Production. Configure private Standard bucket/CORS, then redeploy. Full steps and billing limits: [R2_SETUP.md](R2_SETUP.md). Firebase auth/database settings remain required.

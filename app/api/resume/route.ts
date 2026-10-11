@@ -1,5 +1,6 @@
-import { admin, bucket, published, snapshot, track } from "@/lib/server";
+import { admin, bucket, published, snapshot, track, store } from "@/lib/server";
 import { resumePdf } from "@/lib/pdf";
+import { storageDownload } from "@/lib/storage";
 export const dynamic = "force-dynamic";
 export async function GET(r: Request) {
   try {
@@ -13,6 +14,22 @@ export async function GET(r: Request) {
     let pdf: Uint8Array;
     const media = source.match(/^\/api\/media\/([a-f0-9-]{36})$/);
     if (media) {
+      const metadata = await store.get("media", media[1]);
+      if (metadata && metadata.type !== "application/pdf")
+        return new Response("Choose a PDF resume.", { status: 404 });
+      const download = await storageDownload(media[1]);
+      if (download) {
+        if (!preview && query.get("analytics") === "1")
+          await track("resumes").catch(() => {});
+        return new Response(null, {
+          status: 302,
+          headers: {
+            Location: download,
+            "Cache-Control": "no-store",
+            "Referrer-Policy": "no-referrer",
+          },
+        });
+      }
       const file = await bucket().get(media[1]);
       if (!file || file.httpMetadata.contentType !== "application/pdf")
         return new Response("Resume PDF is unavailable.", { status: 404 });

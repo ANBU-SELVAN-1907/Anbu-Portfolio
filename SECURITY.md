@@ -27,3 +27,7 @@ Dependency audits and regression tests are bounded checks, not a guarantee again
 The private `FIREBASE_SERVICE_ACCOUNT_JSON` is missing locally. Live email delivery, owner login, Firestore writes/rules and deployed-origin checks require the owner's configuration. The optional real AI guide also needs `GEMINI_API_KEY`. Configure secrets privately using FIREBASE_SETUP.md and DEPLOYMENT.md; never commit them or paste them into chat.
 
 Use Firebase Spark and Vercel Hobby without a billing account. Quotas can stop service; this implementation does not enable paid upgrades. Store offline content/media backups and rotate any exposed private credential.
+
+## R2 files
+
+R2 is private; scoped S3 credentials stay server-only. Owner/origin checks protect uploads, migration and backups. SHA-256, declared size, MIME signature and conditional object copy protect original bytes before publication. Replaying a presigned PUT can only recreate an incoming object, never overwrite the promoted file. Signed GET links are temporary bearer access; hiding media prevents new links but does not revoke already issued URLs before expiry. Legacy source bytes are preserved during migration. Backups include private application data and must never use public bucket access. R2 quotas/billing are separate from Firebase Spark.

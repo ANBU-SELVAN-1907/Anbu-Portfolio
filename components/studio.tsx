@@ -52,7 +52,8 @@ import {
   Eye,
   Upload,
 } from "lucide-react";
-import { MAX_MEDIA_BYTES } from "@/lib/media";
+import StoragePanel from "./storage-panel";
+import { MAX_MEDIA_BYTES, MEDIA_ACCEPT, mediaType } from "@/lib/media";
 import { entry, type Content } from "@/lib/content";
 import { contentSchema } from "@/lib/validation";
 import {
@@ -535,18 +536,51 @@ export default function Studio({ email }: { email: string }) {
   async function upload(file: File, purpose = "media") {
     if (file.size > MAX_MEDIA_BYTES)
       throw Error(
-        "Choose an original file up to 4 MiB. Files are stored without compression.",
+        "Choose an original file up to 100 MiB. Files are stored without compression.",
       );
-    const form = new FormData();
-    form.append("file", file);
-    form.append("purpose", purpose);
-    const r = await fetch("/api/media", { method: "POST", body: form });
-    const b = (await r.json()) as State & {
-      error: string;
-      revision: number;
-      updated: string;
-      url: string;
-    };
+    const type = mediaType(file.name, file.type);
+    if (!type)
+      throw Error(
+        "Unsupported file type. Choose a supported image, video, audio, document or data file.",
+      );
+    toast.message("Preparing original file…");
+    const digest = await crypto.subtle.digest(
+      "SHA-256",
+      await file.arrayBuffer(),
+    );
+    const sha256 = [...new Uint8Array(digest)]
+      .map((x) => x.toString(16).padStart(2, "0"))
+      .join("");
+    const request = await fetch("/api/media/upload", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "prepare",
+        name: file.name,
+        type,
+        size: file.size,
+        sha256,
+        purpose,
+      }),
+    });
+    const prepared = await request.json();
+    if (!request.ok) throw Error(prepared.error);
+    const put = await fetch(prepared.uploadUrl, {
+      method: "PUT",
+      headers: prepared.headers,
+      body: file,
+    });
+    if (!put.ok)
+      throw Error(
+        "R2 upload failed. Check your bucket CORS settings and retry.",
+      );
+    toast.message("Verifying original bytes…");
+    const r = await fetch("/api/media/upload", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "finish", id: prepared.id }),
+    });
+    const b = await r.json();
     if (!r.ok) throw Error(b.error);
     const refresh = await fetch("/api/admin");
     if (refresh.ok) {
@@ -619,8 +653,8 @@ export default function Studio({ email }: { email: string }) {
                   : value || "No resume selected")}
           </strong>
           <small>
-            PDF only · maximum 4 MiB for the strict free Firebase setup. Draft
-            uploads remain private until published.
+            PDF only · maximum 100 MiB for the R2 setup. Draft uploads remain
+            private until published.
           </small>
           <div className="field-tools">
             {value && (
@@ -1432,9 +1466,11 @@ export default function Studio({ email }: { email: string }) {
               </div>
             </TabsContent>
             <TabsContent value="media">
+              <StoragePanel />
               <div className="editor-intro">
                 <p>
-                  PNG, JPEG, WebP and PDF · Up to 4 MiB per file.
+                  Images, videos, audio, documents and data files · Up to 100
+                  MiB per file.
                   <br />
                   Files become public when used in published content.
                 </p>
@@ -1442,7 +1478,7 @@ export default function Studio({ email }: { email: string }) {
                   ref={fileRef}
                   hidden
                   type="file"
-                  accept="image/png,image/jpeg,image/webp,application/pdf"
+                  accept={MEDIA_ACCEPT}
                   onChange={(e) => {
                     const f = e.target.files?.[0];
                     if (f)
@@ -1479,7 +1515,15 @@ export default function Studio({ email }: { email: string }) {
                           height={450}
                         />
                       ) : (
-                        <span>PDF</span>
+                        <span>
+                          {m.type.startsWith("video/")
+                            ? "VIDEO"
+                            : m.type.startsWith("audio/")
+                              ? "AUDIO"
+                              : m.type === "application/pdf"
+                                ? "PDF"
+                                : "FILE"}
+                        </span>
                       )}
                     </div>
                     <h3>{m.name}</h3>
@@ -1700,7 +1744,7 @@ export default function Studio({ email }: { email: string }) {
               pickerKind === "resume"
                 ? ".pdf,application/pdf"
                 : pickerKind === "proof"
-                  ? "image/png,image/jpeg,image/webp,application/pdf"
+                  ? MEDIA_ACCEPT
                   : "image/png,image/jpeg,image/webp"
             }
             disabled={busy}
@@ -1741,7 +1785,15 @@ export default function Studio({ email }: { email: string }) {
                       height={450}
                     />
                   ) : (
-                    <span>PDF</span>
+                    <span>
+                      {m.type.startsWith("video/")
+                        ? "VIDEO"
+                        : m.type.startsWith("audio/")
+                          ? "AUDIO"
+                          : m.type === "application/pdf"
+                            ? "PDF"
+                            : "FILE"}
+                    </span>
                   )}
                   <span>{m.name}</span>
                 </button>

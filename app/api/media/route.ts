@@ -8,7 +8,8 @@ import {
   snapshot,
   boundedBytes,
 } from "@/lib/server";
-import { MAX_MEDIA_BYTES } from "@/lib/media";
+import { LEGACY_MAX_MEDIA_BYTES as MAX_MEDIA_BYTES } from "@/lib/media";
+import { r2Remove } from "@/lib/r2";
 export async function POST(r: Request) {
   try {
     if (!sameOrigin(r) || !(await admin()))
@@ -55,22 +56,43 @@ export async function POST(r: Request) {
     const id = crypto.randomUUID();
     await bucket().put(id, bytes, { httpMetadata: { contentType: f.type } });
     try {
-      await store.set("media", id, {
-        id,
-        name: f.name.slice(0, 180),
-        type: f.type,
-        size: f.size,
-        created: new Date().toISOString(),
+      const saved = await store.atomic("storage_usage", "main", (old) => {
+        const total = Number(old?.bytes || 0) + f.size;
+        return total > 9_000_000_000
+          ? null
+          : {
+              data: { bytes: total },
+              result: true,
+              extra: [
+                {
+                  collection: "media",
+                  id,
+                  data: {
+                    id,
+                    name: f.name.slice(0, 180),
+                    type: f.type,
+                    size: f.size,
+                    storage: "r2",
+                    created: new Date().toISOString(),
+                  },
+                },
+              ],
+            };
       });
+      if (!saved) throw Error("Managed R2 storage limit reached.");
     } catch (e) {
-      await bucket().delete(id);
+      try {
+        if (!(await store.get("media", id)))
+          await r2Remove(`media/${id}`).catch(() => {});
+      } catch {
+        /* Preserve objects on an uncertain commit. */
+      }
       throw e;
     }
     return response({ id, url: "/api/media/" + id, name: f.name });
   } catch (e) {
     const failure = requestFailure(e);
     if (failure) return failure;
-    console.error(e);
     return response({ error: "Upload failed. Please try again." }, 503);
   }
 }
@@ -92,6 +114,23 @@ export async function DELETE(r: Request) {
         409,
       );
     await bucket().delete(id);
+    // Claim the release once. A failed/uncertain counter update can overcount,
+    // but retries and concurrent deletes must never undercount managed storage.
+    const released = await store.atomic("media", id, (media) =>
+      media?.storage === "r2" && !media.usageReleased
+        ? {
+            data: { ...media, usageReleased: true },
+            result: Number(media.size),
+          }
+        : null,
+    );
+    if (released !== null)
+      await store.atomic("storage_usage", "main", (old) => ({
+        data: {
+          bytes: Math.max(0, Number(old?.bytes || 0) - released),
+        },
+        result: true,
+      }));
     await store.remove("media", id);
     return response({ ok: true });
   } catch {
