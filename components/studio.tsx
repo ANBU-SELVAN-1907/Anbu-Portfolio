@@ -569,6 +569,10 @@ export default function Studio({ email }: { email: string }) {
       method: "PUT",
       headers: prepared.headers,
       body: file,
+    }).catch(() => {
+      throw Error(
+        `The browser could not reach R2. In Cloudflare, open your bucket → Settings → CORS policy and allow ${window.location.origin}, PUT, content-type and x-amz-meta-sha256. Save the policy and retry. Also check your network connection.`,
+      );
     });
     if (!put.ok)
       throw Error(
